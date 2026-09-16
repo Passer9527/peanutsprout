@@ -85,7 +85,7 @@ function resolveServerLaunch() {
 }
 
 /** 把服务端以子进程方式拉起（开发态 tsx / 打包态 esbuild 产物）。 */
-function startEmbeddedServer(host, port, launch, instanceNonce) {
+function startEmbeddedServer(host, port, launch, instanceNonce, paths) {
   // 绝不把内嵌服务的 CORS 设成星号。
   //
   // 星号意味着用户在浏览器里打开的**任意网页**都能跨源读取本地 API 的响应，
@@ -109,6 +109,15 @@ function startEmbeddedServer(host, port, launch, instanceNonce) {
       PEANUTSPROUT_HOST: host,
       PEANUTSPROUT_PORT: String(port),
       PEANUTSPROUT_SERVE_WEB: 'true',
+      // 数据目录必须传**已解析成绝对路径**的值，不能只是继承 process.env 里的原始值。
+      // 原因：桌面端读设置时用 resolve() 按**本进程的 cwd** 解析相对路径
+      // （见 web-access.mjs 的 resolveDataDir），而子进程的 cwd 是 launch.cwd
+      // （打包态是 resources/server，开发态是仓库根），两者并不相同。
+      // 若用户设了相对的 PEANUTSPROUT_HOME，两边会各自解析到**不同的库**，
+      // 表现为"界面上改了设置却毫无反应"——而且极难排查。
+      // 这里显式传绝对路径，保证父子进程读写同一个库。
+      PEANUTSPROUT_HOME: paths.dataDir,
+      PEANUTSPROUT_DB: paths.dbPath,
       // 服务端会在 /health 回显它，主进程据此确认应答者身份
       PEANUTSPROUT_INSTANCE_NONCE: instanceNonce,
       // 打包态必须显式告诉服务端 Web 产物在哪；开发态留空以保持原行为
@@ -244,7 +253,8 @@ async function bootstrap() {
       // 也让本机其他程序无法猜到地址；打开时改用固定端口，好让用户把网址
       // 发到手机/同事那边（端口每次变的话对方就打不开了）。
       const dataDir = resolveDataDir();
-      const webSettings = readWebAccessSettingsFromDb(resolveDbPath(dataDir));
+      const dbPath = resolveDbPath(dataDir);
+      const webSettings = readWebAccessSettingsFromDb(dbPath);
       const binding = await resolveDesktopBinding({
         settings: webSettings,
         freePortPicker: (bindHost) => pickFreePort(bindHost),
@@ -254,7 +264,10 @@ async function bootstrap() {
       // 每次启动生成一次性实例标识，用于确认端口上应答的是本次启动的子进程
       const instanceNonce = randomBytes(24).toString('hex');
 
-      const child = startEmbeddedServer(binding.host, port, launch, instanceNonce);
+      const child = startEmbeddedServer(binding.host, port, launch, instanceNonce, {
+        dataDir,
+        dbPath,
+      });
       serverProcess = child;
       serverPort = port;
 

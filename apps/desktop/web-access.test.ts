@@ -10,7 +10,7 @@
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 // 纯 JS 辅助模块，桌面端没有 tsconfig；这里只做运行时验证
@@ -142,6 +142,22 @@ describe('resolveDataDir / resolveDbPath：必须与服务端读同一个库', (
     expect(resolveDbPath('/data', {})).toBe('/data/peanutsprout.db');
     expect(resolveDbPath('/data', { PEANUTSPROUT_DB: '/tmp/x.db' })).toBe('/tmp/x.db');
     expect(resolveDbPath('/data', { PEANUTSPROUT_DB: '  ' })).toBe('/data/peanutsprout.db');
+  });
+
+  it('相对路径必须解析成绝对路径', () => {
+    // 这条是"父子进程读同一个库"的关键：桌面端读设置时按**自己的 cwd** 解析，
+    // 而它 spawn 的服务端子进程 cwd 是 launch.cwd（打包态 resources/server、
+    // 开发态仓库根），两者不同。若这里把相对路径原样传下去，同一个
+    // PEANUTSPROUT_HOME 会被两边解析成两个不同的目录，表现为
+    // "界面上改了设置却毫无反应"。因此 resolveDataDir 必须给出绝对路径，
+    // main.mjs 再把该绝对路径显式传给子进程。
+    const dir = resolveDataDir({ PEANUTSPROUT_HOME: './relative-data' });
+    expect(isAbsolute(dir), `应返回绝对路径，实际 ${dir}`).toBe(true);
+    expect(dir.endsWith('relative-data')).toBe(true);
+
+    const db = resolveDbPath('/data', { PEANUTSPROUT_DB: './relative.db' });
+    expect(isAbsolute(db), `应返回绝对路径，实际 ${db}`).toBe(true);
+    expect(db.endsWith('relative.db')).toBe(true);
   });
 });
 
