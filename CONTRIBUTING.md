@@ -65,6 +65,31 @@ pnpm dev:web
 本地数据默认位于 `~/.peanutsprout/`（`peanutsprout.db`、`master.key`、`logs/`）。
 **请勿将 `master.key`、`peanutsprout.db`、日志或任何真实连接口令提交到仓库。**
 
+#### 如果 `pnpm install` 长时间卡住
+
+`electron` 的安装脚本会下载**约 190MB 的 Electron 二进制**，供桌面端使用。
+在国内网络下从 GitHub Releases 拉取会长时间无响应 —— 注意是**静默挂起而不是报错**，
+可能卡几十分钟且没有任何输出。仓库根的 `.npmrc` 已默认配置国内镜像
+（`electron_mirror`），若镜像也不通，按需求二选一：
+
+```bash
+# 只做服务端 / Web 端 / 测试时：直接跳过二进制下载（推荐，几秒装完）
+export ELECTRON_SKIP_BINARY_DOWNLOAD=1
+pnpm install
+
+# 需要跑桌面端时：改用官方源（需能稳定访问 GitHub）
+# 编辑 .npmrc 注释掉 electron_mirror 那一行
+```
+
+跳过二进制后，`pnpm test` / `pnpm typecheck` / `pnpm dev:server` / `pnpm dev:web` 全部照常可用，
+只有 `pnpm dev:desktop` 与 `pnpm package:*` 需要它（`pnpm verify` 会把"Electron 二进制缺失"
+列为**非阻断提醒**，不会伪装成通过）。
+
+> 另外：`pnpm-workspace.yaml` 的 `allowBuilds` 里显式写了 `electron-winstaller: false`。
+> 它只用于生成 Squirrel Windows 安装包，而本项目 win 目标是 NSIS，用不到它。
+> 如果你在 pnpm 提示下把它改成 `set this to true or false` 这类占位符，
+> pnpm 会判定配置非法，之后**任何 pnpm 命令都会失败**（`ERR_PNPM_IGNORED_BUILDS`）。
+
 ### 常用脚本
 
 | 命令 | 说明 |
