@@ -119,26 +119,39 @@ PeanutSprout 桌面应用
 - Electron 二进制下载走 `electronDownload.mirror`（与 `.npmrc` 的 `electron_mirror` 一致），
   否则国内网络下打包会在下载 Electron 时静默挂起，详见 §14.5。
 
-> ⚠️ **不要在 Linux 上交叉构建 Windows 安装包。** electron-builder 必须先用 NSIS
-> 生成一个"卸载器生成器"，再**运行它**（Linux 上靠 wine）来产出 `uninstall.exe`。
-> 而 electron-builder 自带下载的 wine 工具链（`wine@1.0.0` / `wine@1.0.1` 的
-> `wine-11.0-linux-x86_64.tar.xz`）是**残缺的**：只有 unix 侧的
-> `lib/wine/x86_64-unix`，完全没有 PE 侧的 `lib/wine/x86_64-windows`
-> （完整安装应有 700+ 个 DLL，它只有 26 个，缺 `kernel32.dll` 与 apiset），
-> 无法运行任何 Windows 程序，构建必然止步于
-> `wine: failed to load .../x86_64-unix/ntdll.dll error c0000135`。
-> 即使本机装了系统 wine，交叉构建也只是"能跑通"，签名与 SmartScreen 信誉仍需在
-> Windows 上处理。**Windows 安装包请在 Windows 上构建**——
-> 用 `.github/workflows/build-windows.yml`（`windows-latest`，x64 + arm64），
-> 或本地 Windows 机器上跑 `pnpm package:win`。
+> ✅ **在 Linux 上交叉构建 Windows 安装包是可行的，前提是装系统 wine。**
+> 已在 Linux 上完整构建并实测通过（见 §14.6）。但有三个坑必须知道：
 >
-> 该工作流的**脚本合成本身已验证**：`packaging/windows/installer.nsh` 能被
-> makensis 编译通过且零 warning（electron-builder 把 warning 当 error，
-> 所以零 warning 即编译合格的硬证据）。在 Linux 上跑 `electron-builder --win nsis`
-> 时，日志出现 `building target=nsis file=…` 而无任何 `warning`/`Error` 行，
-> 就说明脚本没问题、只剩 wine 这一环；此时 release/ 下那个约 170 KB 的
-> `PeanutSprout-Setup-*.exe` 是 `BUILD_UNINSTALLER` 中间产物
-> （真正安装包约 80–100 MB），**不是可用安装包，不要分发**。
+> 1. **必须用系统 wine，不要用 electron-builder 自带的。** electron-builder 必须先用
+>    NSIS 生成一个"卸载器生成器"，再**运行它**（Linux 上靠 wine）来产出
+>    `uninstall.exe`。它自带下载的那份工具链（`wine@1.0.0` / `wine@1.0.1` 的
+>    `wine-11.0-linux-x86_64.tar.xz`）是**残缺的**：只有 unix 侧的
+>    `lib/wine/x86_64-unix`，完全没有 PE 侧的 `lib/wine/x86_64-windows`
+>    （完整安装应有 700+ 个 DLL，它只有 26 个，缺 `kernel32.dll` 与 apiset），
+>    构建必然止步于 `wine: failed to load .../x86_64-unix/ntdll.dll error c0000135`。
+>    所以本仓库**刻意不声明 `toolsets.wine`**（声明了会覆盖系统 wine 并白下 30 MB 坏包），
+>    请先 `sudo apt install wine64`（实测 wine 10.0 可用）。
+>    ⚠️ 判断 wine 是否可用**一定要实跑** `wine cmd /c echo ok`：残缺的包也能正常打印
+>    `wine --version`（那一步不需要 PE 侧），只看版本号会误判。
+>
+> 2. **wine 里跑不了 electron-builder 生成的安装包**（构建得出来、能验证结构，
+>    但装不上）。安装程序用 PowerShell + `Get-CimInstance` 做"应用是否在运行"的
+>    单实例检测，而 wine 的 PowerShell 对该探测**错误地返回 0**（谎报可用），
+>    于是走了 CIM 分支，wine 又没实现 CIM，安装程序反复重试后以退出码 2 中止。
+>    这与本仓库的脚本无关：对照实验里**完全不含自定义脚本**的原版 electron-builder
+>    安装包失败方式一模一样（退出码 2、10 次 powershell、0 文件）。
+>    要在 wine 下验证安装流程，用测试夹具（§14.6）。**产品安装包不受影响**：
+>    真实 Windows 有完整的 PowerShell 与 CIM。
+>
+> 3. **签名与 SmartScreen 信誉仍需在 Windows 上处理**。
+>
+> Windows 机器上构建则完全没有上述问题：`.github/workflows/build-windows.yml`
+> （`windows-latest`，x64 + arm64）或本地跑 `pnpm package:win`。
+> Windows 主机上根本不会用到 wine（`WineVmManager.execWine` 检测到 win32 直接跑原生 exe）。
+>
+> **别被中间产物骗到**：构建失败时 `release/` 下会留下约 170 KB 的
+> `PeanutSprout-Setup-*.exe`，那是 `BUILD_UNINSTALLER` 中间产物
+> （真正安装包约 80–170 MB），**不是可用安装包，不要分发**。
 
 ---
 
@@ -1140,10 +1153,57 @@ ELECTRON_RUN_AS_NODE=1 PEANUTSPROUT_WEB_DIST="$PWD/resources/web" \
 | **AppImage** | `electron-builder --linux AppImage --x64` | ✅ `release/PeanutSprout-Setup-0.1.0-linux-x86_64.AppImage`（103.2 MB）。`.DirIcon`→1024px 图标；内置 `.desktop` 正确；**载荷实机启动成功**（`--appimage-extract` 校验 + `--appimage-extract-and-run`：内嵌服务就绪、`/health` 返回 ok、作者/微信/协议元信息与 Web 资源均正常）。注意本机缺 `libfuse.so.2`，**直接执行 .AppImage 文件**会报 FUSE 缺失（环境限制，非产物缺陷） |
 | rpm 安装包 | `electron-builder --linux rpm --x64` | ⚠️ 配置与 fpm 参数全部正确（`--name/--vendor/--url/--rpm-summary` + 9 图标 + .desktop 路径均已生成），但本机缺 `rpmbuild` 而失败（`Need executable 'rpmbuild'`）。装 `rpm` 后即可产出 |
 | arm64 产物（Linux） | `pnpm package:linux` | ✅ 已实际产出 `…-linux-arm64.deb`（76.3 MB）与 `…-linux-arm64.AppImage`（103.4 MB），说明 arm64 Electron 二进制下载正常。**注意**：这是 Linux arm64，与 AC-08 要求的 macOS arm64 不可互相替代 |
-| Windows / macOS 安装包 | — | ⚠️ 未产出：需对应平台的 Electron 二进制、NSIS/dmg 工具链与签名环境；PNG→ICO/ICNS 还需从 GitHub 下载 `icons@1.1.0` 工具包。仅完成配置与 schema 校验 |
+| Windows / macOS 安装包 | — | ✅ **Windows 已产出并实测**（见 §14.6.1）；macOS 仍缺：需 macOS 上的 Electron 二进制、dmg 工具链与 Developer ID 签名/公证环境 |
 
-> 结论：Linux 产物链路（dir / deb / AppImage × x64+arm64）已在本机端到端跑通并验证；
-> Windows 与 macOS 属于"配置就绪但本环境不可产出"，须在原生 runner 上按 §14.7 验证。
+> 结论：Linux 产物链路（dir / deb / AppImage × x64+arm64）与 **Windows 产物链路
+> （NSIS × x64/arm64/通用 + portable × 3）**已在本机端到端跑通并验证；
+> macOS 属于"配置就绪但本环境不可产出"，须在 macOS runner 上按 §14.7 验证。
+
+### 14.6.1 Windows 安装包的实测记录（Linux + wine 10.0）
+
+构建（Linux 上交叉构建，需要系统 wine，理由见 §2.3）：
+
+```bash
+sudo apt install wine64          # 只有 wine64 时 32 位 NSIS 外壳靠 WoW64 跑
+wine cmd /c echo ok              # 必须实跑！只看 wine --version 会误判
+pnpm package:win                 # -> release/PeanutSprout-Setup-0.1.0-win{,-x64,-arm64}.exe
+```
+
+| 项 | 结果 |
+| --- | --- |
+| 编译 | ✅ 零 warning（electron-builder 把 warning 当 error，故零 warning 即编译合格的硬证据）。曾因自定义页被卸载器那一趟零化而报 `warning 6010`、因 `Var` 声明跨趟不匹配报 `warning 6001`，均已修掉 |
+| 产物 | ✅ `Setup-…-win-x64.exe` 84.4 MB、`Setup-…-win-arm64.exe` 79.0 MB、`Setup-…-win.exe`（通用 x64+arm64）162.9 MB，另有 3 个 portable。注意失败时会留下约 170 KB 的 `BUILD_UNINSTALLER` 中间产物，别误当成品 |
+| 自选安装路径 | ✅ 静默安装 `/S /D=C:\PeanutTest` 落到了指定目录（297 MB、21 项、含 `Uninstall peanutsprout.exe`），未落到默认位置 |
+| 快捷方式（默认=都创建） | ✅ 桌面 `C:\users\passer\Desktop\花生苗数据库管理工具.lnk` 与开始菜单 `…\Start Menu\Programs\花生苗数据库管理工具.lnk` 均创建；`.lnk` 内容指向 `C:\PeanutTest\peanutsprout.exe` |
+| 卸载清理 | ✅ `Uninstall peanutsprout.exe /S` 后安装目录被删、**两个快捷方式都被清理，零残留**。这一条是关键的回归点：`createDesktopShortcut/createStartMenuShortcut` 设为 `false` 会让 electron-builder 的卸载器**整段跳过**快捷方式清理，所以必须靠 `customUnInstall` 自己删 |
+| ⚠️ 未验证 | **向导界面本身没跑过**（本机无 X display，也无 Xvfb/xdotool）：复选框的渲染与默认勾选状态、以及"取消勾选后不创建/删除快捷方式"的分支，只有代码与编译层面的保证，没有 GUI 断言。静默安装走的是"默认都创建"那条分支 |
+
+#### 在 wine 下验证安装流程的夹具（为什么需要它）
+
+**wine 里直接跑产品安装包会以退出码 2 中止**，这不是脚本的问题：安装程序用
+PowerShell + `Get-CimInstance` 做单实例检测，而 wine 的 PowerShell 对该探测
+**错误地返回 0**（谎报可用），于是走 CIM 分支，wine 又没实现 CIM。
+对照实验证明这与本仓库无关：**完全不含自定义脚本**的原版 electron-builder 安装包
+在本机 wine 下失败方式一模一样（退出码 2、10 次 powershell、0 文件）。
+
+夹具用 electron-builder 支持的 `customCheckAppRunning` 扩展点把这一步换成空操作
+（`_CHECK_APP_RUNNING` 不能直接复用：它首行的 `${GetProcessInfo}` 所在文件
+并非在所有分支下都被包含），其余逻辑**逐字复用产品脚本**：
+
+```bash
+cd apps/desktop
+npx electron-builder --config electron-builder.winetest.yml --win nsis --x64
+# 产物在 release-winetest/，随后可正常跑安装/卸载
+```
+
+- `packaging/windows/installer.winetest.nsh` —— 夹具，**产品配置不引用它**
+- `apps/desktop/electron-builder.winetest.yml` —— 指向夹具、输出到 `release-winetest/`
+
+写夹具时踩到一个坑值得记下来：里面 `!include "installer.nsh"` 必须写成
+`!include "${__FILEDIR__}\installer.nsh"`。因为 electron-builder 会给 makensis 传
+`-I .../app-builder-lib/templates/nsis/include`，那个目录下**也有**一个同名
+`installer.nsh`，裸文件名会被优先命中，结果是产品脚本根本没加载、模板被重复包含，
+报出一串 `error in script: …/include/extractAppPackage.nsh on line 1`。
 
 ### 14.7 发布前自检清单（桌面端）
 

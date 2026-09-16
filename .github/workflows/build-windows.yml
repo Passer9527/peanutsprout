@@ -1,7 +1,8 @@
 # 在 Windows 上构建花生苗的 Windows 安装包（NSIS）
 #
 # 为什么需要这个工作流：
-#   在 Linux 上交叉构建 Windows 安装包时，electron-builder 必须先用 NSIS 生成一个
+#   在 Linux 上交叉构建 Windows 安装包是**可行的**（已实测，见 docs/deployment.md
+#   §14.6.1），但依赖系统 wine：electron-builder 必须先用 NSIS 生成一个
 #   "卸载器生成器"，再**运行它**（Linux 上靠 wine）来产出真正的 uninstall.exe。
 #   electron-builder 自带的 wine 工具链（wine@1.0.0 / wine@1.0.1 的
 #   wine-11.0-linux-x86_64.tar.xz，约 30 MB）是**残缺的**：它只带 unix 侧的
@@ -9,7 +10,8 @@
 #   （缺 kernel32.dll、apiset 等，完整安装应有 700+ 个 DLL，它只有 26 个），
 #   因此无法运行任何 Windows 程序，构建必然失败在最后一步：
 #     wine: failed to load .../x86_64-unix/ntdll.dll error c0000135
-#   在真机上补装系统 wine 需要 root 权限。最干净的做法是**回到 Windows 上构建** ——
+#   在 Linux 上补装系统 wine 需要 root 权限，且即便装好也只解决了"构建"——
+#   签名与 SmartScreen 信誉仍要在 Windows 上处理。所以这里**回到 Windows 上构建**：
 #   那里没有 wine 这一环，由 Windows 自己运行卸载器生成器。
 #
 # 这个工作流做三件事：
@@ -19,6 +21,7 @@
 #
 # 说明：本文件的构建逻辑与 scripts/verify.mjs、package.json 的 package:win 保持一致，
 # 但**没有在 CI 里实际跑过**（本地无 GitHub Actions 运行器），首次运行时请留意日志。
+# 同一套构造在 Linux + 系统 wine 10.0 上已实测通过（见 docs/deployment.md §14.6.1）。
 
 name: Build Windows installers
 

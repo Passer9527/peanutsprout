@@ -73,23 +73,38 @@
 
 ### 已知限制（如实记录）
 
-- **本次没能产出可用的 Windows 安装包。** 安装包脚本本身**已验证能编译通过**
-  （makensis 无任何 warning/error；electron-builder 把 warning 当 error，
-  所以"零 warning"即编译合格的硬证据），但构建卡在最后一步：electron-builder
-  在 Linux 上必须**运行** NSIS 生成的卸载器生成器（靠 wine）才能产出
-  `uninstall.exe`。本机既无系统 wine（`sudo` 需交互口令，无法安装），
-  而 electron-builder 自带下载的 wine 工具链是**残缺的**：
-  `wine@1.0.0` / `wine@1.0.1` 提供的 `wine-11.0-linux-x86_64.tar.xz`（约 30 MB）
-  只有 unix 侧的 `lib/wine/x86_64-unix`，**完全没有 PE 侧的
-  `lib/wine/x86_64-windows`**——完整安装应有 700+ 个 DLL，它只有 26 个，
-  且缺 `kernel32.dll` 与 apiset，因此无法运行任何 Windows 程序，必然失败于
-  `wine: failed to load .../x86_64-unix/ntdll.dll error c0000135`
-  （解包核对过压缩包内容，排除了下载截断）。这也是新增上面那个工作流的原因：
-  回到 Windows 上构建，就没有 wine 这一环。
-  构建中途产生的 172 KB `release/PeanutSprout-Setup-0.1.0-win-x64.exe` 是
-  `BUILD_UNINSTALLER` 中间产物（真正安装包约 80–100 MB），**不是可用安装包**，已删除。
-- 该工作流**尚未在真实 GitHub Actions 运行器上跑过**（本机没有运行器），
-  首次运行请留意日志。
+- **Windows 安装包已产出并实测通过**（先前记录为"未能产出"，原因是本机当时没有
+  系统 wine；补装 wine 10.0 后构建与安装验证均已跑通）：
+  `Setup-…-win-x64.exe` 84.4 MB、`Setup-…-win-arm64.exe` 79.0 MB、
+  `Setup-…-win.exe`（通用 x64+arm64）162.9 MB，另有 3 个 portable 变体。
+  实测覆盖：makensis 零 warning；静默安装 `/S /D=C:\PeanutTest` **确实落到自选路径**
+  （297 MB、21 项、含卸载器）；桌面与开始菜单**两个快捷方式都被创建**且 `.lnk`
+  指向正确；`Uninstall peanutsprout.exe /S` 后安装目录被删、
+  **两个快捷方式都被清理、零残留**（`createDesktopShortcut` 设 `false` 会让
+  electron-builder 的卸载器整段跳过快捷方式清理，必须靠 `customUnInstall` 补上，
+  这一条正是回归验证的重点）。
+- **但向导界面本身没跑过**：本机无 X display，也没有 Xvfb/xdotool，所以复选框的
+  渲染、默认勾选状态、以及"取消勾选后不创建/删除快捷方式"的分支，
+  只有代码与编译层面的保证，没有 GUI 断言；静默安装走的是"默认都创建"那条分支。
+  `docs/deployment.md` §14.6.1 记录了验证方法与这条空白。
+- **wine 里跑不了产品安装包（不是本仓库脚本的问题）**：安装程序用 PowerShell +
+  `Get-CimInstance` 做单实例检测，wine 的 PowerShell 对该探测**错误地返回 0**
+  （谎报可用），于是走 CIM 分支而 wine 没实现 CIM，安装程序反复重试后以退出码 2 中止。
+  对照实验证明与本仓库无关：**完全不含自定义脚本**的原版 electron-builder 安装包
+  在同样的 wine 下失败方式一模一样（退出码 2、10 次 powershell、0 文件）。
+  为此新增了测试夹具 `packaging/windows/installer.winetest.nsh` +
+  `apps/desktop/electron-builder.winetest.yml`（产品配置不引用），
+  用 `customCheckAppRunning` 把这一步换成空操作，其余逻辑逐字复用产品脚本——
+  上面那些安装/卸载验证就是靠它跑出来的。产品安装包不受影响：真实 Windows 有完整
+  PowerShell 与 CIM。
+- `toolsets.wine` **保持不声明**：electron-builder 自带的 wine 工具链是残缺的
+  （`wine@1.0.0`/`1.0.1` 的 `wine-11.0-linux-x86_64.tar.xz` 只有 unix 侧
+  `lib/wine/x86_64-unix`，没有 PE 侧 `lib/wine/x86_64-windows`，缺 `kernel32.dll`
+  与 apiset），声明了会覆盖本来能用的系统 wine 并白下 30 MB 坏包。
+  注意 `wine --version` 对残缺的包也能打印版本号，判断可用性必须实跑一条命令。
+- Windows CI 工作流 `.github/workflows/build-windows.yml` **尚未在真实 GitHub Actions
+  运行器上跑过**（本机没有运行器），首次运行请留意日志。同一套构造已在
+  Linux + 系统 wine 下实测通过。
 - 新增的「局域网访问」界面**从未在真实浏览器里点过**（仓库未装 DOM 测试环境，
   也不打算为此引入）：`WebAccessCard.tsx` 的渲染与交互只有类型检查、
   服务端接口的端到端测试、以及纯函数单测覆盖，没有 DOM 断言。

@@ -46,26 +46,42 @@ directories:
 electronDownload:
   mirror: https://registry.npmmirror.com/-/binary/electron/
 
-# ── 关于在非 Windows 主机上打 Windows 包（实测结论，别再走这条路）────────────────
+# ── 关于在 Linux 上打 Windows 包（实测结论）────────────────────────────────────
 #
-# electron-builder 打 Windows 目标时，最后一步要在非 Windows 主机上**运行**由 NSIS
-# 先产出的"卸载器生成器"，才能得到真正的 uninstall.exe。这一步必须靠 wine：
+# **可行，但必须装系统 wine。** 已在 Linux 上完整构建并实测通过：x64 / arm64 /
+# 通用三个 NSIS 安装包 + 三个 portable，随后用 wine 跑通了「安装 → 校验快捷方式
+# → 卸载 → 校验快捷方式被清理」的全流程。
+#
+# 为什么必须要 wine：electron-builder 打 Windows 目标时，最后一步要在非 Windows
+# 主机上**运行**由 NSIS 先产出的"卸载器生成器"，才能得到真正的 uninstall.exe。
 #   Linux 上默认回退到**系统 wine**（未安装时直接 `spawn wine ENOENT`，
 #   报错里完全看不出是在等 wine）；macOS 上下载它自带的 wine-4.0.1。
+# 本仓库要求系统 wine ≥ 9（实测 wine 10.0）。未装时先 `sudo apt install wine64`
+# （或发行版对应包），`wine cmd /c echo ok` 能打印 ok 才算真的可用 —— 只跑
+# `wine --version` 会误判，见下。
 #
-# 曾试图用 `toolsets: { wine: '1.0.1' }` 指定自带 wine-11.0 来摆脱对系统的依赖。
-# **实测该工具链是残缺的，此路不通**：`wine@1.0.0` / `wine@1.0.1` 提供的
-# wine-11.0-linux-x86_64.tar.xz（约 30 MB）只有 unix 侧的 lib/wine/x86_64-unix，
-# 完全没有 PE 侧的 lib/wine/x86_64-windows —— 完整安装应有 700+ 个 DLL，
-# 它只有 26 个，且缺 kernel32.dll 与 apiset。解包核对该压缩包确认不是下载截断。
-# 结果：连 `wine cmd /c echo` 都跑不起来，构建必然止步于
-#   wine: failed to load .../x86_64-unix/ntdll.dll error c0000135
-# （`wine --version` 能打印版本号，因为那一步不需要 PE 侧，容易误判成"wine 可用"。）
+# 这里**刻意不声明 toolsets.wine**，因为 electron-builder 自带的那份是残缺的：
+# `wine@1.0.0` / `wine@1.0.1` 提供的 wine-11.0-linux-x86_64.tar.xz（约 30 MB）
+# 只有 unix 侧的 lib/wine/x86_64-unix，完全没有 PE 侧的 lib/wine/x86_64-windows
+# —— 完整安装应有 700+ 个 DLL，它只有 26 个，且缺 kernel32.dll 与 apiset
+# （解包核对该压缩包确认不是下载截断）。声明了只会每次构建白下 30 MB 坏包，
+# 并且覆盖掉本来能用的系统 wine。**别再把它加回来。**
+# 注意 `wine --version` 对残缺的包也能正常打印版本号（那一步不需要 PE 侧），
+# 所以判断 wine 是否可用一定要实跑一条命令，不能只看版本号。
 #
-# 所以这里**刻意不声明 toolsets.wine**：声明了也只是每次构建白下 30 MB 坏包。
-# Windows 安装包请在 Windows 上构建，见 .github/workflows/build-windows.yml
+# ⚠️ 但即便构建成功，**wine 里跑不了 electron-builder 的安装包**：
+# 安装程序用 PowerShell + Get-CimInstance 做"应用是否在运行"的单实例检测，
+# 而 wine 的 PowerShell 对该探测**错误地返回 0**（谎报 Get-CimInstance 可用），
+# 于是走 CIM 分支，wine 又没实现 CIM，安装程序反复重试后以退出码 2 中止。
+# 这与本仓库的脚本无关 —— 对照实验里**完全不含自定义脚本**的原版
+# electron-builder 安装包失败方式一模一样。
+# 要在 wine 下验证安装流程，用测试夹具 `packaging/windows/installer.winetest.nsh`
+# 配合 `apps/desktop/electron-builder.winetest.yml`（见 docs/deployment.md §14.6）。
+# **产品安装包不受影响**：真实 Windows 有完整的 PowerShell 与 CIM。
+#
+# 另一条路是在 Windows 上构建：.github/workflows/build-windows.yml
 # （windows-latest，x64 + arm64）或本地 Windows 机器跑 `pnpm package:win`。
-# Windows 主机上本来就不需要 wine：WineVmManager.execWine 检测到 win32 会直接跑原生 exe。
+# Windows 主机上根本不会用到 wine：WineVmManager.execWine 检测到 win32 直接跑原生 exe。
 #
 # 注意：NSIS 编译器（nsis@3.0.4.1）与 winCodeSign 是**另一回事**，它们在 Linux 上
 # 也能正常工作，本仓库的 .npmrc 已用 electron_builder_binaries_mirror 指向国内镜像。
