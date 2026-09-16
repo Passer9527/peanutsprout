@@ -1,0 +1,21 @@
+{
+  "name": "@peanutsprout/migration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "花生苗数据迁移：导入导出、字段映射、异构迁移与同步（规划中，本期为接口骨架）",
+  "license": "AGPL-3.0-or-later",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@peanutsprout/core": "workspace:*",
+    "@peanutsprout/drivers": "workspace:*",
+    "@peanutsprout/storage": "workspace:*"
+  }
+}

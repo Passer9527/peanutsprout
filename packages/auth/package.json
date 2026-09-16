@@ -1,0 +1,20 @@
+{
+  "name": "@peanutsprout/auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "花生苗认证授权层：scrypt 口令、JWT 会话、RBAC、资源级授权",
+  "license": "AGPL-3.0-or-later",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@peanutsprout/core": "workspace:*",
+    "@peanutsprout/storage": "workspace:*"
+  }
+}

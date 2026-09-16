@@ -1,0 +1,67 @@
+{
+  "name": "peanutsprout",
+  "version": "0.1.0",
+  "private": true,
+  "description": "花生苗数据库管理工具 - 跨平台数据库统一管理客户端",
+  "author": "飞哥 <微信 6731663>",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Passer9527/peanutsprout.git"
+  },
+  "homepage": "https://github.com/Passer9527/peanutsprout#readme",
+  "bugs": {
+    "url": "https://github.com/Passer9527/peanutsprout/issues"
+  },
+  "keywords": [
+    "database",
+    "sql",
+    "sqlite",
+    "mysql",
+    "postgresql",
+    "electron",
+    "typescript",
+    "database-management",
+    "ai",
+    "i18n"
+  ],
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r --no-bail typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev:server": "pnpm --filter @peanutsprout/server dev",
+    "dev:web": "pnpm --filter @peanutsprout/web dev",
+    "dev:desktop": "pnpm --filter @peanutsprout/desktop dev",
+    "cli": "pnpm --filter @peanutsprout/cli exec tsx src/index.ts",
+    "ddl:export": "node --import tsx scripts/export-ddl.mjs",
+    "bootstrap": "pnpm install && node --import tsx scripts/bootstrap.mjs",
+    "verify": "node --import tsx scripts/verify.mjs",
+    "build:web": "pnpm --filter @peanutsprout/web build",
+    "build:server": "node scripts/build-server.mjs",
+    "build:app": "pnpm build:web && pnpm build:server",
+    "icons": "node scripts/generate-icons.mjs",
+    "package:dir": "pnpm build:app && pnpm --filter @peanutsprout/desktop run package:dir",
+    "package:linux": "pnpm build:app && pnpm --filter @peanutsprout/desktop run package:linux",
+    "package:win": "pnpm build:app && pnpm --filter @peanutsprout/desktop run package:win",
+    "package:mac": "pnpm build:app && pnpm --filter @peanutsprout/desktop run package:mac",
+    "package:mac:pkg": "pnpm build:app && pnpm --filter @peanutsprout/desktop run package:mac:pkg",
+    "package:all": "pnpm build:app && pnpm --filter @peanutsprout/desktop run package:all",
+    "package:linux:rpm": "pnpm build:app && pnpm --filter @peanutsprout/desktop run package:linux:rpm"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@electric-sql/pglite-socket": "0.2.11",
+    "@embedded-postgres/linux-x64": "18.4.0-beta.17",
+    "@types/node": "^24.10.1",
+    "esbuild": "0.28.2",
+    "mysql-memory-server": "^1.16.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,221 @@
+/**
+ * 한국어 · AI 어시스턴트(공급자 설정 / 어시스턴트 화면)
+ * Copyright (C) 2025 飞哥 (微信 6731663)
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * 용어 관례:
+ *  · 「공급자」는 OpenAI / Anthropic / Ollama 같은 서비스 제공자(provider)를 뜻합니다.
+ *  · 「모델」은 구체적인 모델 이름(modelName)을 뜻합니다.
+ *  · 「스킬」은 nl2sql / explain 등 여섯 가지 용도(scene)를 뜻합니다.
+ * 공통 버튼(취소, 닫기, 삭제)은 common을 재사용하며 여기에서 중복 정의하지 않습니다.
+ */
+import type { MessageKeyWithPlurals } from '../../index.js';
+
+const messages: Partial<Record<MessageKeyWithPlurals, string>> = {
+  // —— 공급자 표시 이름 ——
+  'ai.provider.openai': 'OpenAI',
+  'ai.provider.anthropic': 'Anthropic',
+  'ai.provider.google': 'Google Gemini',
+  'ai.provider.qwen': 'Qwen',
+  'ai.provider.ernie': 'ERNIE',
+  'ai.provider.zhipu': 'Zhipu AI',
+  'ai.provider.deepseek': 'DeepSeek',
+  'ai.provider.ollama': 'Ollama(로컬)',
+  'ai.provider.openaiCompatible': 'OpenAI 호환 서비스(vLLM / LM Studio / 자체 구축)',
+
+  // —— 설정 페이지: AI 카드 ——
+  'ai.settings.title': 'AI 어시스턴트',
+  'ai.settings.subtitle': '대규모 언어 모델 공급자를 설정합니다. API Key는 AES-256-GCM으로 암호화되어 로컬 데이터베이스에 저장되며 평문으로 기록되지 않습니다.',
+  'ai.settings.master.label': 'AI 기능 사용',
+  'ai.settings.master.hint': '전체 스위치입니다. 끄면 모든 AI 스킬이 「AI 기능이 활성화되지 않았습니다」를 반환하고 외부 요청을 전혀 보내지 않습니다.',
+  'ai.settings.redaction.label': '민감 데이터 마스킹',
+  'ai.settings.redaction.hint': '결과 집합을 모델에 보내기 전에 휴대폰 번호, 주민등록번호, 이메일, 은행 카드 등의 열을 자동으로 마스크로 바꿉니다.',
+  'ai.settings.prodWrite.label': 'AI가 운영 데이터베이스에 쓰기 문을 생성하도록 허용',
+  'ai.settings.prodWrite.hint': '기본값은 꺼짐입니다. 생성되더라도 SQL은 편집기에서 직접 확인한 후에만 실행됩니다.',
+  'ai.settings.serverWriteNote': '위 스위치는 서버에 저장되며 모든 사용자에게 적용됩니다.',
+
+  // —— 설정 목록 ——
+  'ai.settings.list.title': '모델 설정',
+  'ai.settings.list.empty': '아직 설정된 대규모 언어 모델이 없습니다',
+  'ai.settings.list.emptyHint': '「설정 추가」를 클릭하여 클라우드 API에 연결하거나 로컬 모델 주소(예: Ollama)를 입력하여 오프라인으로 사용하세요.',
+  'ai.settings.list.colName': '이름',
+  'ai.settings.list.colProvider': '공급자',
+  'ai.settings.list.colModel': '모델',
+  'ai.settings.list.colBaseUrl': '인터페이스 주소',
+  'ai.settings.list.colStatus': '상태',
+  'ai.settings.badge.default': '기본',
+  'ai.settings.badge.enabled': '사용 중',
+  'ai.settings.badge.disabled': '사용 안 함',
+  'ai.settings.badge.hasKey': '키 설정됨',
+  'ai.settings.badge.noKey': '키 불필요',
+
+  // —— 목록 작업 ——
+  'ai.settings.action.add': '설정 추가',
+  'ai.settings.action.edit': '편집',
+  'ai.settings.action.delete': '삭제',
+  'ai.settings.action.setDefault': '기본값으로 설정',
+  'ai.settings.action.test': '연결 테스트',
+  'ai.settings.action.openAssistant': 'AI 어시스턴트 열기',
+
+  // —— 양식 ——
+  'ai.settings.form.createTitle': '모델 설정 추가',
+  'ai.settings.form.editTitle': '모델 설정 편집',
+  'ai.settings.field.name': '설정 이름',
+  'ai.settings.field.namePlaceholder': '예: 로컬 Ollama',
+  'ai.settings.field.provider': '공급자',
+  'ai.settings.field.model': '모델 이름',
+  'ai.settings.field.modelPlaceholder': '예: qwen2.5-coder:7b',
+  'ai.settings.field.modelLoad': '서버에서 가져오기',
+  'ai.settings.field.modelLoading': '가져오는 중…',
+  'ai.settings.field.modelLoaded': '모델 {count}개를 가져와 드롭다운에 채웠습니다',
+  'ai.settings.field.modelEmpty': '서버가 모델을 반환하지 않았습니다',
+  'ai.settings.field.baseUrl': '인터페이스 주소(Base URL)',
+  'ai.settings.field.baseUrlPlaceholder': '비워 두면 해당 공급자의 기본 주소를 사용합니다',
+  'ai.settings.field.apiKey': 'API Key',
+  'ai.settings.field.apiKeyPlaceholder': '로컬 모델은 보통 비워 둡니다',
+  'ai.settings.field.apiKeyKeep': '비워 두면 저장된 키를 변경하지 않습니다',
+  'ai.settings.field.apiKeyStored': '키가 저장되어 있습니다. 변경하려면 다시 입력하세요',
+  'ai.settings.field.temperature': 'Temperature(0~2)',
+  'ai.settings.field.maxTokens': '최대 출력 token',
+  'ai.settings.field.maxTokensHint': '비워 두면 서버가 결정합니다',
+  'ai.settings.field.timeout': '시간 초과(밀리초)',
+  'ai.settings.field.isDefault': '기본 모델로 설정',
+  'ai.settings.field.enabled': '이 설정 사용',
+  'ai.settings.form.testHint': '먼저 「연결 테스트」로 주소와 키가 올바른지 확인한 뒤 저장하는 것을 권장합니다.',
+  'ai.settings.form.save': '설정 저장',
+
+  // —— 테스트 결과 ——
+  'ai.settings.test.testing': '테스트 중…',
+  'ai.settings.test.ok': '연결 정상, 소요 시간 {ms} ms',
+  'ai.settings.test.reply': '모델 응답: {reply}',
+  'ai.settings.test.failed': '연결 실패',
+
+  // —— 삭제 확인 ——
+  'ai.settings.delete.title': '모델 설정 삭제',
+  'ai.settings.delete.body': '「{name}」을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없지만 이미 발생한 호출 기록에는 영향을 주지 않습니다.',
+
+  // —— 알림 ——
+  'ai.settings.toast.created': '모델 설정이 생성되었습니다',
+  'ai.settings.toast.updated': '모델 설정이 수정되었습니다',
+  'ai.settings.toast.deleted': '모델 설정이 삭제되었습니다',
+  'ai.settings.toast.defaultSet': '기본 모델로 설정되었습니다',
+  'ai.settings.toast.settingSaved': '설정이 저장되었습니다',
+  'ai.settings.toast.autosaved': '설정이 자동 저장되었습니다',
+
+  // —— 오류 ——
+  'ai.settings.err.nameRequired': '설정 이름을 입력하세요',
+  'ai.settings.err.modelRequired': '모델 이름을 입력하세요',
+  'ai.settings.err.providerRequired': '공급자를 선택하세요',
+  'ai.settings.err.loadFailed': 'AI 설정을 불러오지 못했습니다: {message}',
+  'ai.settings.err.saveFailed': '저장에 실패했습니다: {message}',
+  'ai.settings.err.deleteFailed': '삭제에 실패했습니다: {message}',
+  'ai.settings.err.testFailed': '테스트에 실패했습니다: {message}',
+  'ai.settings.err.modelsFailed': '모델 목록을 가져오지 못했습니다: {message}',
+  'ai.settings.err.defaultFailed': '기본 모델 설정에 실패했습니다: {message}',
+
+  // —— AI 어시스턴트 화면 ——
+  'ai.assistant.title': 'AI 어시스턴트',
+  'ai.assistant.subtitle': '자연어로 데이터베이스를 다룹니다. AI는 생성만 담당하며 절대 대신 실행하지 않습니다.',
+  'ai.assistant.sceneLabel': '스킬',
+  'ai.assistant.connectionLabel': '대상 연결',
+  'ai.assistant.connectionPlaceholder': '연결을 선택하세요',
+  'ai.assistant.connectionHint': '테이블 구조를 컨텍스트로 모델에 제공하는 데 사용합니다',
+  'ai.assistant.rowsLabel': '결과 데이터',
+  'ai.assistant.rowsPlaceholder': '결과 집합을 붙여넣으세요: 첫 줄은 열 이름, 탭 또는 쉼표로 구분',
+  'ai.assistant.rowsHint': '전송 전에 민감한 열은 자동으로 마스킹됩니다',
+  'ai.assistant.inputPlaceholder': '예: 최근 7일 주문 금액 상위 10명 사용자',
+  'ai.assistant.sendHint': 'Ctrl / ⌘ + Enter로 전송',
+  'ai.assistant.inputLabel': '질문',
+  'ai.assistant.sqlLabel': '처리할 SQL',
+  'ai.assistant.sqlPlaceholder': 'SQL을 붙여 넣으면 AI가 설명하거나 최적화 제안을 제공합니다',
+  'ai.assistant.errorLabel': '오류 메시지',
+  'ai.assistant.errorPlaceholder': '데이터베이스가 반환한 오류를 붙여 넣으세요',
+  'ai.assistant.send': '전송',
+  'ai.assistant.sending': '생성 중…',
+  'ai.assistant.clear': '대화 지우기',
+  'ai.assistant.emptyTitle': 'AI와 대화 시작하기',
+  'ai.assistant.emptyHint': '왼쪽에서 스킬을 선택하고 입력을 채운 뒤 「전송」을 클릭하면 됩니다.',
+  'ai.assistant.you': '나',
+  'ai.assistant.model': 'AI',
+  'ai.assistant.copy': '복사',
+  'ai.assistant.copied': '클립보드에 복사되었습니다',
+  'ai.assistant.copyFailed': '복사에 실패했습니다. 텍스트를 직접 선택하세요',
+  'ai.assistant.useInEditor': 'SQL 복사',
+  'ai.assistant.noExecuteWarning': 'AI는 SQL만 생성할 뿐 자동으로 실행하지 않습니다. 확인한 뒤 「실행」 또는 「복사」를 선택하세요.',
+  'ai.assistant.exportNeedTable': '대상 테이블 이름을 입력하세요',
+  'ai.assistant.exportNeedConnection': '대상 연결을 선택하세요',
+  'ai.assistant.exportToDbDone': '{table}에 {count}개 행을 기록했습니다',
+  'ai.assistant.exportRun': '내보내기 시작',
+  'ai.assistant.exportReplaceWarning': '덮어쓰기는 대상 테이블을 먼저 삭제합니다. 기존 데이터는 모두 사라지고 되돌릴 수 없습니다.',
+  'ai.assistant.exportModeReplace': '덮어쓰기 (먼저 삭제)',
+  'ai.assistant.exportModeAppend': '기존 테이블에 추가',
+  'ai.assistant.exportModeCreate': '새로 만들기 (있으면 오류)',
+  'ai.assistant.exportMode': '쓰기 방식',
+  'ai.assistant.exportTargetTablePlaceholder': '예: user_summary',
+  'ai.assistant.exportTargetTable': '대상 테이블 이름',
+  'ai.assistant.exportTargetConnection': '대상 연결',
+  'ai.assistant.exportToDb': '데이터베이스로 내보내기',
+  'ai.assistant.exportTruncated': '결과가 행 수 상한을 넘어 앞부분만 내보냈습니다',
+  'ai.assistant.exportFailed': '내보내기 실패: {message}',
+  'ai.assistant.exportDone': '{name} 내보내기 완료',
+  'ai.assistant.exportExcel': 'Excel로 내보내기',
+  'ai.assistant.clearDone': '호출 기록 {count}건을 비웠습니다',
+  'ai.assistant.rollbackDone': '되돌렸습니다. 호출 기록 {count}건을 삭제했습니다',
+  'ai.assistant.rollbackHint': '이 작업 시점으로 돌아갑니다. 이후 대화는 삭제되고 입력 내용은 복원됩니다',
+  'ai.assistant.rollbackHere': '여기로 되돌리기',
+  'ai.assistant.withdrawFailed': '철회 실패: {message}',
+  'ai.assistant.withdrawDone': '철회했습니다',
+  'ai.assistant.withdrawHint': '이 메시지를 철회합니다 (사용자 메시지는 해당 답변까지 함께 철회됩니다)',
+  'ai.assistant.withdraw': '철회',
+  'ai.assistant.noConnection': '사용할 연결이 없습니다. 위에서 대상 연결을 먼저 선택하세요.',
+  'ai.assistant.executeTruncated': '결과가 잘렸습니다',
+  'ai.assistant.executeRows': '{count}개 행 반환',
+  'ai.assistant.executeAffected': '{count}개 행 영향',
+  'ai.assistant.executeFailed': '실행 실패: {message}',
+  'ai.assistant.executeConfirmYes': '실행',
+  'ai.assistant.executeConfirm': '쓰기 작업입니다. 실행하면 데이터가 변경됩니다. 계속할까요?',
+  'ai.assistant.copySql': 'SQL 복사',
+  'ai.assistant.executing': '실행 중…',
+  'ai.assistant.execute': '실행',
+  // —— 각 스킬 이름과 설명 ——
+  'ai.scene.nl2sql': '자연어를 SQL로 변환',
+  'ai.scene.nl2sqlHint': '한국어로 요구 사항을 설명하면 실행 가능한 SELECT 문을 생성합니다',
+  'ai.scene.explain': 'SQL 설명',
+  'ai.scene.explainHint': 'SQL 한 편이 무엇을 하는지 구절마다 설명합니다',
+  'ai.scene.optimize': 'SQL 최적화',
+  'ai.scene.optimizeHint': '인덱스, 재작성 등 성능 제안을 제공합니다',
+  'ai.scene.document': '문서 생성',
+  'ai.scene.documentHint': '테이블 구조에 따라 필드 설명 문서를 생성합니다',
+  'ai.scene.ask': '결과 집합 질의',
+  'ai.scene.askHint': '현재 결과 데이터에 대해 질문하며, 외부 전송 전에 자동으로 마스킹합니다',
+  'ai.scene.diagnose': '오류 진단',
+  'ai.scene.diagnoseHint': '오류 원인을 분석하고 수정 제안을 제공합니다',
+
+  // —— 생성 결과 표시 ——
+  'ai.result.generatedSql': '생성된 SQL',
+  'ai.result.explanation': '설명',
+  'ai.result.confidence': '신뢰도',
+  'ai.result.tables': '관련 테이블',
+  'ai.result.suggestions': '최적화 제안',
+  'ai.result.cause': '가능한 원인',
+  'ai.result.severity.critical': '심각',
+  'ai.result.severity.warning': '경고',
+  'ai.result.severity.info': '정보',
+  'ai.result.tokens': '입력 {input} / 출력 {output} token',
+
+  // —— 사용할 수 없는 상태 ——
+  'ai.disabled.title': 'AI 기능이 활성화되지 않았습니다',
+  'ai.disabled.hint': '「설정 → AI 어시스턴트」에서 전체 스위치를 켠 후 사용하세요.',
+  'ai.disabled.action': '설정으로 이동',
+  'ai.notConfigured.title': '사용 가능한 모델이 없습니다',
+  'ai.notConfigured.hint': '「설정 → AI 어시스턴트」에서 대규모 언어 모델 설정을 추가하세요. 로컬 모델(Ollama)도 가능합니다.',
+  'ai.notConfigured.action': '설정으로 이동',
+
+  // —— 호출 기록 ——
+  'ai.history.title': '최근 호출',
+  'ai.history.empty': '호출 기록이 없습니다',
+  'ai.history.failed': '실패',
+  'ai.history.success': '성공',
+};
+
+export default messages;

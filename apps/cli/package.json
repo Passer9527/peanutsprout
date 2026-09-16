@@ -1,0 +1,22 @@
+{
+  "name": "@peanutsprout/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "花生苗命令行工具 peanutsprout",
+  "license": "AGPL-3.0-or-later",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@peanutsprout/auth": "workspace:*",
+    "@peanutsprout/core": "workspace:*",
+    "@peanutsprout/drivers": "workspace:*",
+    "@peanutsprout/server": "workspace:*",
+    "@peanutsprout/storage": "workspace:*",
+    "commander": "^14.0.1"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@peanutsprout/ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "花生苗 AI 助手：模型接入、NL2SQL、脱敏网关（规划中，本期为接口骨架）",
+  "license": "AGPL-3.0-or-later",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@peanutsprout/core": "workspace:*",
+    "@peanutsprout/storage": "workspace:*"
+  }
+}

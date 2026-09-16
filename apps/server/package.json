@@ -1,0 +1,31 @@
+{
+  "name": "@peanutsprout/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "花生苗服务端：Fastify REST API（桌面内嵌 + 独立部署）",
+  "license": "AGPL-3.0-or-later",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.1.0",
+    "@fastify/static": "^8.2.0",
+    "@peanutsprout/ai": "workspace:*",
+    "@peanutsprout/auth": "workspace:*",
+    "@peanutsprout/core": "workspace:*",
+    "@peanutsprout/drivers": "workspace:*",
+    "@peanutsprout/migration": "workspace:*",
+    "@peanutsprout/storage": "workspace:*",
+    "@peanutsprout/visualization": "workspace:*",
+    "fastify": "^5.6.1",
+    "zod": "^4.1.11"
+  }
+}

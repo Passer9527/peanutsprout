@@ -1,0 +1,30 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# pnpm >= 10 默认阻止依赖的生命周期脚本。以下包必须允许执行安装脚本：
+#  - electron: 安装脚本负责下载对应平台的 Electron 二进制（约 190MB）
+#  - esbuild: 安装脚本负责获取平台相关的构建产物
+#  - @embedded-postgres/linux-x64: 仅测试用，内置 PostgreSQL 服务端二进制
+#
+# 注意：这些值必须是布尔值。当 pnpm 需要人工确认时，它会自动写入
+# `set this to true or false` 这样的占位字符串；若未及时替换，pnpm 会判定配置
+# 非法并继续跳过构建脚本，表现为"装完了但二进制不存在"。
+allowBuilds:
+  '@embedded-postgres/linux-x64': true
+  electron: true
+  esbuild: true
+
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+  - '@embedded-postgres/linux-x64'
+
+# 打包链路的上游缺陷规避（pnpm >= 10 的设置只从本文件读取，不再读 package.json 的 pnpm 字段）：
+#   app-builder-lib@26.15.3 声明依赖 @electron/get ^3.0.0，却在运行时不加判断地读取
+#   ElectronDownloadCacheMode —— 该导出是 @electron/get 3.1.0 才加入的。
+#   锁到 3.0.0 时 electron-builder 会在解析 Electron 缓存目录时直接
+#   抛 “Cannot read properties of undefined (reading 'ReadWrite')”，任何 package:* 都无法构建。
+#   这里只把 app-builder-lib 这一条依赖抬到 ^3.1.0，不影响 electron 自身需要的 @electron/get 2.x。
+overrides:
+  'app-builder-lib>@electron/get': ^3.1.0

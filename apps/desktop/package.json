@@ -1,0 +1,33 @@
+{
+  "name": "@peanutsprout/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "花生苗桌面端：Electron 外壳，内嵌本地服务与 Web 界面",
+  "license": "AGPL-3.0-or-later",
+  "author": "飞哥 <微信 6731663>",
+  "homepage": "https://github.com/peanutsprout/peanutsprout",
+  "productName": "PeanutSprout",
+  "desktopName": "peanutsprout.desktop",
+  "main": "main.mjs",
+  "scripts": {
+    "dev": "node scripts/launch.mjs",
+    "start": "node scripts/launch.mjs",
+    "typecheck": "node --check main.mjs && node --check port-util.mjs && node --check scripts/launch.mjs",
+    "build:server": "node ../../scripts/build-server.mjs",
+    "package:dir": "electron-builder --dir",
+    "package:linux": "electron-builder --linux --x64 --arm64",
+    "package:win": "electron-builder --win --x64 --arm64",
+    "package:mac": "electron-builder --mac --x64 --arm64",
+    "package:mac:pkg": "electron-builder --mac pkg --x64 --arm64",
+    "package:all": "electron-builder -mwl --x64 --arm64",
+    "package:linux:rpm": "electron-builder --linux rpm --x64 --arm64"
+  },
+  "devDependencies": {
+    "@peanutsprout/core": "workspace:*",
+    "@peanutsprout/server": "workspace:*",
+    "@peanutsprout/storage": "workspace:*",
+    "electron": "^38.2.2",
+    "electron-builder": "^26.15.3"
+  }
+}

@@ -1,0 +1,204 @@
+# 花生苗数据库管理工具 - 桌面端打包配置（electron-builder）
+# Copyright (C) 2025 飞哥 (微信 6731663)
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# 为什么配置文件放在 apps/desktop/ 而不是仓库根：
+#   electron-builder 需要一个"项目目录"来推断 Electron 版本（读
+#   <projectDir>/node_modules/electron/package.json）与 main 字段。本仓库把
+#   electron 只装在 apps/desktop（pnpm workspace 的依赖是隔离的），
+#   所以只有把 apps/desktop 当 projectDir 才能算出 38.8.6；
+#   放到仓库根会直接报 "Cannot compute electron version"。
+#   因此所有命令都通过 `pnpm --filter @peanutsprout/desktop run package:*` 执行
+#   （cwd = apps/desktop），仓库根的 package:win/linux/mac/all 只是转发。
+#
+# 产物命名遵循 PRD：PeanutSprout-Setup-{version}-{os}-{arch}.{ext}
+#   {os}   : win / linux / mac
+#   {arch} : Windows/macOS 为 x64 / arm64；Linux 按发行版惯例转换
+#            （deb → amd64，rpm/AppImage → x86_64 / aarch64）
+#   实测：PeanutSprout-Setup-0.1.0-linux-amd64.deb
+#         PeanutSprout-Setup-0.1.0-linux-x86_64.AppImage
+#         PeanutSprout-Setup-0.1.0-win-x64.exe
+#         PeanutSprout-Setup-0.1.0-mac-arm64.dmg
+#
+# 前置条件：先跑 `pnpm build:app`（构建 apps/web/dist + build/server.mjs）。
+# 打包矩阵、命令与已知坑见 docs/deployment.md「桌面端打包」与 packaging/README.md。
+#
+# ⚠️ 相对路径有两套基准，改路径时务必注意：
+#   - files / extraResources / directories / mac.entitlements → 相对 apps/desktop
+#   - win.icon / mac.icon / linux.icon / nsis.include / nsis.license
+#     → 相对 buildResources（即 packaging/build-resources），
+#       因为 electron-builder 用 getResource() 解析这些键。
+
+appId: com.peanutsprout.desktop
+productName: PeanutSprout
+# 可执行文件名固定为 peanutsprout（PRD 命名规范；与 CLI 同名不冲突）
+executableName: peanutsprout
+copyright: Copyright (C) 2025 飞哥 (微信 6731663)
+artifactName: PeanutSprout-Setup-${version}-${os}-${arch}.${ext}
+
+directories:
+  buildResources: ../../packaging/build-resources
+  output: ../../release
+
+# 打包时 electron-builder 需要下载目标平台/架构的 Electron 二进制（默认走
+# GitHub Releases）。国内网络下该地址常静默挂起，这里与 .npmrc 的
+# electron_mirror 保持一致指向 npmmirror；海外或有代理时删掉本段即可。
+electronDownload:
+  mirror: https://registry.npmmirror.com/-/binary/electron/
+
+# 入包内容：只有 Electron 外壳本身（main.mjs + port-util.mjs + package.json）。
+# 为什么一个 node_modules 都不带：服务端已被 esbuild 内联成单文件
+# （scripts/build-server.mjs -> build/server.mjs），桌面端运行时不需要任何 npm 依赖。
+# 显式排除 node_modules 还能避免 electron-builder 顺着 pnpm 的符号链接
+# 把整个 .pnpm store（数百 MB）拖进安装包。
+files:
+  - main.mjs
+  # main.mjs 依赖的纯 Node 辅助模块（随机端口/身份校验，无第三方依赖）。
+  # 必须是相对 apps/desktop 的路径，且不能漏——漏了打包态会 ERR_MODULE_NOT_FOUND。
+  - port-util.mjs
+  - package.json
+  - '!node_modules/**'
+  - '!**/*.map'
+
+# 运行时资产（放在 asar 之外，路径稳定、便于排查）：
+#   server/ ← build/server.mjs        服务端单文件产物（无 tsx / 无 TypeScript）
+#   web/    ← apps/web/dist           Web 界面；服务端通过 PEANUTSPROUT_WEB_DIST 指向它
+extraResources:
+  - from: ../../build/server.mjs
+    to: server/server.mjs
+  - from: ../../build/server.mjs.map
+    to: server/server.mjs.map
+  - from: ../../apps/web/dist
+    to: web
+
+asar: true
+# 当前零原生依赖；将来若引入 .node 原生模块，在这里补 asarUnpack
+asarUnpack: []
+nodeGypRebuild: false
+buildDependenciesFromSource: false
+npmRebuild: false
+# 只保留中英文 Electron locale，其余语言包直接剔除（安装包更小）
+electronLanguages:
+  - en-US
+  - zh-CN
+
+# ---------------------------------------------------------------------------
+# Windows：安装版（NSIS）+ 免安装版（portable），x64 与 arm64
+# ---------------------------------------------------------------------------
+win:
+  icon: icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - arm64
+    - target: portable
+      arch:
+        - x64
+        - arm64
+
+nsis:
+  # 不做一键静默安装：允许用户选目录，避免装到没有权限的位置
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 花生苗数据库管理工具
+  uninstallDisplayName: 花生苗数据库管理工具 (PeanutSprout)
+  installerLanguages:
+    - zh_CN
+    - en_US
+  # 卸载时**保留** %USERPROFILE%\.peanutsprout（连接密文/主密钥/审计都在里面）
+  deleteAppDataOnUninstall: false
+  # 自定义卸载提示：明确告知数据目录位置，避免用户以为"卸载=清干净"
+  include: ../windows/installer.nsh
+  # 安装向导展示 AGPL-3.0 全文
+  license: ../../LICENSE
+
+portable:
+  # portable 与 nsis 都是 .exe，若不单独命名会互相覆盖
+  artifactName: PeanutSprout-Portable-${version}-${os}-${arch}.${ext}
+
+# ---------------------------------------------------------------------------
+# macOS：dmg + zip（x64 与 arm64）
+# 为什么默认不带 pkg：pkg 必须用 "Developer ID Installer" 证书签名，
+# 未配置证书时会直接构建失败；需要时用 `pnpm package:mac:pkg` 单独出包。
+# 未配置证书时 dmg/zip 仍会产出（未签名，Gatekeeper 会拦截，仅内测用）。
+# ---------------------------------------------------------------------------
+mac:
+  icon: icon.png
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  # ⚠️ 这两个键 electron-builder 会原样交给 codesign，不做路径解析，
+  #    所以必须写成相对 apps/desktop（打包命令的 cwd）的路径。
+  #    若从别的目录调用 electron-builder，请把该文件复制到
+  #    packaging/build-resources/ 下再用内建查找（见 packaging/README.md）。
+  entitlements: ../../packaging/macos/entitlements.mac.plist
+  entitlementsInherit: ../../packaging/macos/entitlements.mac.plist
+
+dmg:
+  title: 花生苗数据库管理工具 ${version}
+
+pkg:
+  # 仅由 `pnpm package:mac:pkg` 使用（需要 Developer ID Installer 证书）；
+  # 默认目标里不含 pkg，避免没证书时整个 macOS 构建失败。
+  installLocation: /Applications
+
+# ---------------------------------------------------------------------------
+# Linux：AppImage + deb + rpm（x64 与 arm64）
+# 注意：deb/rpm 由 electron-builder 内置的 fpm 生成，首次构建会去 GitHub
+# 下载 fpm 二进制；网络受限时可用 USE_SYSTEM_FPM=true + 系统 fpm 绕过。
+# 另外 rpm 还需要系统有 rpmbuild（Debian/Ubuntu: apt install rpm），deb 不需要。
+# ---------------------------------------------------------------------------
+linux:
+  icon: icons
+  category: Development
+  # desktopName（写在 apps/desktop/package.json 里）会被 Electron 当作 Linux 的
+  # app_id / StartupWMClass，electron-builder 用它命名 .desktop 文件。必须三处一致，
+  # 否则 GNOME/KDE 无法把运行中的窗口关联到这个桌面项（任务栏出现"双图标"）。
+  syncDesktopName: true
+  synopsis: 跨平台数据库统一管理客户端
+  description: |
+    花生苗（PeanutSprout）数据库管理工具：SQLite / MySQL / PostgreSQL 统一连接、
+    查询、结构与数据对比、迁移与审计。桌面端内嵌本地服务，数据目录 ~/.peanutsprout。
+  # deb 强制要求维护者字段（格式：Name <email>）。发布前请替换为真实邮箱。
+  maintainer: 飞哥 <noreply@peanutsprout.local>
+  vendor: PeanutSprout
+  # 默认只构建 AppImage + deb：这两个目标只依赖 electron-builder 自带的工具，
+  # 任何 Linux 机器上都能直接成功。
+  #
+  # rpm **刻意不放进默认列表**：它需要系统装有 rpmbuild（Debian/Ubuntu 上要
+  # `sudo apt-get install rpm`），否则 fpm 会以 "Need executable 'rpmbuild'" 失败，
+  # 导致 `pnpm package:linux` 整条命令退出码 1 —— 明明 deb 和 AppImage 已经产出了。
+  # 需要 rpm 时用 `pnpm package:linux:rpm`（等价于 electron-builder --linux rpm），
+  # 或在 CI 里先装好 rpm 再把 rpm 加回本列表。
+  target:
+    - target: AppImage
+      arch:
+        - x64
+        - arm64
+    - target: deb
+      arch:
+        - x64
+        - arm64
+  desktop:
+    entry:
+      Name: 花生苗数据库管理工具
+      GenericName: Database Manager
+      Categories: Development;Database;
+      Keywords: database;sql;sqlite;mysql;postgresql;peanutsprout;
+      # Comment 无法在这里自定义：electron-builder 会在合并 desktop.entry 之后
+      # 用 linux.description（若有）无条件覆盖 Comment。想让菜单里的说明更短，
+      # 只能改上面的 description——但那同时也是 deb/rpm 的长描述。
+      StartupWMClass: peanutsprout

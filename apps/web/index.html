@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="花生苗 - 数据库统一管理客户端 Web 管理界面" />
+    <title>花生苗 · 数据库统一管理客户端</title>
+    <script>
+      // 在首屏渲染前确定主题与语言：
+      //   · 主题：避免深色模式闪白；
+      //   · lang：避免读屏软件/字体回退先用错语言（React 挂载后还会再同步一次）。
+      (function () {
+        try {
+          var storedLocale = window.localStorage.getItem('peanutsprout.locale');
+          var supported = ['zh-CN', 'zh-TW', 'en', 'ru', 'ja', 'ko'];
+          if (storedLocale && supported.indexOf(storedLocale) !== -1) {
+            document.documentElement.lang = storedLocale;
+            document.documentElement.dataset.locale = storedLocale;
+          }
+        } catch (error) {
+          /* localStorage 不可用时保持默认的 zh-CN */
+        }
+        try {
+          var stored = window.localStorage.getItem('peanutsprout.theme');
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+        } catch (error) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

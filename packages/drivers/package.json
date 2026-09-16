@@ -1,0 +1,27 @@
+{
+  "name": "@peanutsprout/drivers",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "花生苗驱动适配层：驱动注册表、SQLite 内置驱动、跨库类型映射、连接池",
+  "license": "AGPL-3.0-or-later",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@peanutsprout/core": "workspace:*",
+    "mysql2": "^3.24.4",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@electric-sql/pglite-socket": "0.2.11",
+    "@types/pg": "^8.23.1",
+    "mysql-memory-server": "^1.16.0"
+  }
+}

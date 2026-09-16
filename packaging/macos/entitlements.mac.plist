@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  花生苗数据库管理工具 - macOS 签名授权（entitlements）
+  Copyright (C) 2025 飞哥 (微信 6731663)
+  SPDX-License-Identifier: AGPL-3.0-or-later
+
+  由 apps/desktop/electron-builder.yml 的 mac.entitlements /
+  mac.entitlementsInherit 引用。
+
+  为什么开了 hardenedRuntime（强化运行时）还必须给这些豁免：
+    - Electron 的 V8 需要 JIT 与可写可执行内存，否则主进程启动即崩溃；
+    - App 与 Electron helper/内嵌服务子进程并非同一份签名，必须关闭库校验，
+      否则 osx-sign 直接报 "code object is not signed at all"。
+  这是 Electron 官方文档给出的最小集合，不要额外放宽
+  （例如 com.apple.security.cs.allow-dyld-environment-variables）。
+
+  未配置证书时 electron-builder 会跳过签名，本文件不生效；
+  正式发布需 Developer ID Application 证书 + notarytool 公证。
+-->
+<plist version="1.0">
+  <dict>
+    <!-- V8 JIT：必需 -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <!-- V8 的可写可执行内存：必需 -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <!-- 允许加载非同一 Team ID 签名的库 -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+  </dict>
+</plist>
