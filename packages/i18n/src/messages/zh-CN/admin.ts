@@ -99,6 +99,39 @@ export default {
   'admin.settings.about.stack': 'Web 技术栈',
   'admin.settings.about.stackValue': 'React 19 · TypeScript 5.9 · Vite 7（无第三方 UI / 状态 / 路由 / 图表库）',
 
+  // —— 设置：局域网访问（Web 页面）——
+  'admin.webAccess.title': '局域网访问（Web 页面）',
+  'admin.webAccess.subtitle':
+    '开启后，同一局域网内的其它设备可以直接用浏览器访问本工具；关闭时只监听 127.0.0.1，仅本机可用。',
+  'admin.webAccess.toggle.label': '允许局域网访问',
+  'admin.webAccess.toggle.hint': '关闭时只绑定 127.0.0.1，其它机器无法连接。',
+  'admin.webAccess.port.label': '访问端口',
+  'admin.webAccess.port.hint': '取值范围 1024–65535。开启后端口固定不变，发给别人的网址才长期有效。',
+  'admin.webAccess.port.err': '端口需为 1024–65535 之间的整数。',
+  'admin.webAccess.save': '保存设置',
+  'admin.webAccess.saving': '保存中…',
+  'admin.webAccess.current.title': '当前实际生效',
+  'admin.webAccess.current.on': '已开放局域网 · {host}:{port}',
+  'admin.webAccess.current.off': '仅本机可访问 · {host}:{port}',
+  'admin.webAccess.restart.title': '需要重启后生效',
+  'admin.webAccess.restart.body':
+    '监听地址与端口只在程序启动时确定。设置已保存，重启花生苗后新的地址才会生效。',
+  'admin.webAccess.url.title': '可用访问地址',
+  'admin.webAccess.url.empty': '未检测到局域网地址，请检查网络连接。',
+  'admin.webAccess.copy': '复制',
+  'admin.webAccess.copied': '地址已复制到剪贴板。',
+  'admin.webAccess.embedded':
+    '桌面端窗口始终通过 127.0.0.1 访问，不受此开关影响；这里控制的是「是否允许局域网内其它设备访问」。',
+  'admin.webAccess.warn.lan_exposed':
+    '局域网访问已开放：同一网络内的任何人都能打开登录页。请确认账号口令足够强，并只在自己信任的网络里开启。',
+  'admin.webAccess.warn.no_https':
+    '当前使用 HTTP 明文传输，登录口令与查询结果在局域网内可能被嗅探，建议仅在可信内网使用。',
+  'admin.webAccess.warn.default_password':
+    '仍有账号在使用初始口令。请先修改这些账号的密码，再开放局域网访问。',
+  'admin.webAccess.err.load': '读取局域网设置失败：{message}',
+  'admin.webAccess.err.save': '保存局域网设置失败：{message}',
+  'admin.webAccess.err.copy': '复制失败，请手动选中地址后复制。',
+
   // —— 提示条（toast）——
   'admin.toast.close': '关闭提示',
 } as const;

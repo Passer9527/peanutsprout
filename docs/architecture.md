@@ -115,8 +115,8 @@ PRD §0.3 与附录 A 约定：原文 Java 风格接口在项目中以 **TypeScr
 
 | 环境变量 | 默认 | 说明 |
 | --- | --- | --- |
-| `PEANUTSPROUT_HOST` | `127.0.0.1` | 监听地址；暴露公网需显式改并配 TLS/反代 |
-| `PEANUTSPROUT_PORT` | `8787` | 端口 |
+| `PEANUTSPROUT_HOST` | `127.0.0.1` | 监听地址；暴露公网需显式改并配 TLS/反代。**一旦显式设置，就优先于界面上的「局域网访问」开关** |
+| `PEANUTSPROUT_PORT` | `8787` | 端口。同上：显式设置时优先于界面设置 |
 | `PEANUTSPROUT_HOME` | `~/.peanutsprout` | 数据目录（`packages/core/src/paths.ts`） |
 | `PEANUTSPROUT_DB` | `<数据目录>/peanutsprout.db` | 库文件覆盖 |
 | `PEANUTSPROUT_MASTER_KEY` | `<数据目录>/master.key` | 主密钥文件覆盖 |
@@ -129,6 +129,20 @@ PRD §0.3 与附录 A 约定：原文 Java 风格接口在项目中以 **TypeScr
 | `PEANUTSPROUT_LOG_LEVEL` | `info` | 日志级别 |
 | `PEANUTSPROUT_TLS_KEY` / `PEANUTSPROUT_TLS_CERT` | 空 | 同时提供才启用 HTTPS |
 | `PEANUTSPROUT_IDLE_CONN_MS` | `1800000`（30min） | 空闲连接回收阈值，`0` 关闭 |
+
+界面上还有两个**可写设置项**（`PUT /meta/settings`，需 `settings.manage`）：
+
+| 设置项 | 默认 | 说明 |
+| --- | --- | --- |
+| `web.lan_enabled` | `false` | 是否允许局域网内其它设备用浏览器访问。开启后绑 `0.0.0.0` + 固定端口，关闭时绑 `127.0.0.1` + 随机端口（桌面端） |
+| `web.lan_port` | `8787` | 局域网访问端口，范围 1024–65535 |
+
+与 `PEANUTSPROUT_HOST` / `PEANUTSPROUT_PORT` 的关系：**环境变量优先**。
+这两个设置在监听地址的决策里只是"部署方没有硬性要求时的默认值"。
+改完必须重启才生效（绑定只能在 `listen` 之前决定），
+`GET /meta/web-access` 会分别返回 `saved` 与 `effective` 并给出 `restartRequired`。
+桌面端为了让界面开关生效，会自己先读设置、再以环境变量传给内嵌服务端子进程
+（`apps/desktop/web-access.mjs`）。
 
 ---
 

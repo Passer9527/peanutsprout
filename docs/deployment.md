@@ -108,8 +108,37 @@ PeanutSprout 桌面应用
 - `electron-builder.yml` 中显式声明 `nodeGypRebuild: false`、`buildDependenciesFromSource: false`、`npmRebuild: false`。
 - 首次启动前不写数据目录（安装器不触碰用户数据）；卸载默认保留 `~/.peanutsprout`，
   Windows 卸载器会弹窗提示"数据与密钥在 …，如需彻底清理请手动删除"（`packaging/windows/installer.nsh`）。
+- **Windows 安装向导可选安装路径与快捷方式**：`oneClick: false` +
+  `allowToChangeInstallationDirectory: true` 提供「选择安装位置」页；快捷方式由
+  `packaging/windows/installer.nsh` 的自定义页（`customPageAfterChangeDir`）提供，
+  两个复选框默认勾选，静默安装按"默认都创建"处理。
+  注意 `createDesktopShortcut` / `createStartMenuShortcut` 必须为 `false`——
+  electron-builder 没有"让用户选"这一档，必须关掉它的自动创建；但同一个宏
+  （`DO_NOT_CREATE_*_SHORTCUT`）**也让卸载器整段跳过快捷方式清理**，
+  所以 `customUnInstall` 里自己删了。改那两行前请先读该文件的注释。
 - Electron 二进制下载走 `electronDownload.mirror`（与 `.npmrc` 的 `electron_mirror` 一致），
   否则国内网络下打包会在下载 Electron 时静默挂起，详见 §14.5。
+
+> ⚠️ **不要在 Linux 上交叉构建 Windows 安装包。** electron-builder 必须先用 NSIS
+> 生成一个"卸载器生成器"，再**运行它**（Linux 上靠 wine）来产出 `uninstall.exe`。
+> 而 electron-builder 自带下载的 wine 工具链（`wine@1.0.0` / `wine@1.0.1` 的
+> `wine-11.0-linux-x86_64.tar.xz`）是**残缺的**：只有 unix 侧的
+> `lib/wine/x86_64-unix`，完全没有 PE 侧的 `lib/wine/x86_64-windows`
+> （完整安装应有 700+ 个 DLL，它只有 26 个，缺 `kernel32.dll` 与 apiset），
+> 无法运行任何 Windows 程序，构建必然止步于
+> `wine: failed to load .../x86_64-unix/ntdll.dll error c0000135`。
+> 即使本机装了系统 wine，交叉构建也只是"能跑通"，签名与 SmartScreen 信誉仍需在
+> Windows 上处理。**Windows 安装包请在 Windows 上构建**——
+> 用 `.github/workflows/build-windows.yml`（`windows-latest`，x64 + arm64），
+> 或本地 Windows 机器上跑 `pnpm package:win`。
+>
+> 该工作流的**脚本合成本身已验证**：`packaging/windows/installer.nsh` 能被
+> makensis 编译通过且零 warning（electron-builder 把 warning 当 error，
+> 所以零 warning 即编译合格的硬证据）。在 Linux 上跑 `electron-builder --win nsis`
+> 时，日志出现 `building target=nsis file=…` 而无任何 `warning`/`Error` 行，
+> 就说明脚本没问题、只剩 wine 这一环；此时 release/ 下那个约 170 KB 的
+> `PeanutSprout-Setup-*.exe` 是 `BUILD_UNINSTALLER` 中间产物
+> （真正安装包约 80–100 MB），**不是可用安装包，不要分发**。
 
 ---
 
@@ -716,6 +745,12 @@ peanutsprout conn test <连接id>              # 抽样验证密文可解密且�
 | 签名 | Windows Authenticode（EV 证书更优，避免 SmartScreen 警告）；macOS Developer ID + `notarytool` 公证；Linux 用 GPG 签名 `deb`/`rpm` 与发布包 `sha256sum` |
 | 体积 | 桌面安装包目标 ≤ 150 MB；服务端 tar.gz ≤ 30 MB；超出阈值需在 PR 中说明 |
 | 产物清单 | 每个 Release 附 `checksums.txt`、SBOM（`pnpm licenses list`/CycloneDX）、`diag` 使用说明、升级说明 |
+
+**Windows 桌面安装包的实际入口**：`.github/workflows/build-windows.yml`
+（`windows-latest`，`electron-builder --win nsis --x64 --arm64`，
+生成 `SHA256SUMS-windows.txt`，推 `v*` 标签时自动附到 Release）。
+手动触发（Actions 页面 `Run workflow`）与 PR 改动打包相关文件时也会跑。
+选在 Windows 上构建的原因见 §2.3 的告警框：Linux 交叉构建依赖的 wine 工具链是残缺的。
 
 示例 CI 矩阵（YAML 片段）：
 

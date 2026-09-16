@@ -163,6 +163,18 @@ export const WRITABLE_SETTINGS: Record<string, WritableSettingSpec> = {
     type: 'boolean',
     note: '是否允许 AI 对生产连接生成写语句（默认禁止）',
   },
+  'web.lan_enabled': {
+    category: 'web',
+    type: 'boolean',
+    note: '是否允许同网段的其他设备用浏览器访问 Web 页面（默认关闭）。开启后需重启生效',
+  },
+  'web.lan_port': {
+    category: 'web',
+    type: 'integer',
+    min: 1024,
+    max: 65535,
+    note: '局域网访问使用的固定端口（仅在 web.lan_enabled 打开时生效）。改动后需重启生效',
+  },
   'query.max_rows': {
     category: 'query',
     type: 'integer',

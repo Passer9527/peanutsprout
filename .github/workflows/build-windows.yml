@@ -1,0 +1,127 @@
+# 在 Windows 上构建花生苗的 Windows 安装包（NSIS）
+#
+# 为什么需要这个工作流：
+#   在 Linux 上交叉构建 Windows 安装包时，electron-builder 必须先用 NSIS 生成一个
+#   "卸载器生成器"，再**运行它**（Linux 上靠 wine）来产出真正的 uninstall.exe。
+#   electron-builder 自带的 wine 工具链（wine@1.0.0 / wine@1.0.1 的
+#   wine-11.0-linux-x86_64.tar.xz，约 30 MB）是**残缺的**：它只带 unix 侧的
+#   lib/wine/x86_64-unix，完全没有 PE 侧的 lib/wine/x86_64-windows
+#   （缺 kernel32.dll、apiset 等，完整安装应有 700+ 个 DLL，它只有 26 个），
+#   因此无法运行任何 Windows 程序，构建必然失败在最后一步：
+#     wine: failed to load .../x86_64-unix/ntdll.dll error c0000135
+#   在真机上补装系统 wine 需要 root 权限。最干净的做法是**回到 Windows 上构建** ——
+#   那里没有 wine 这一环，由 Windows 自己运行卸载器生成器。
+#
+# 这个工作流做三件事：
+#   1. 跑类型检查与全部测试（打包前先确认没坏）；
+#   2. 在 windows-latest 上构建 x64 与 arm64 的 NSIS 安装包；
+#   3. 上传产物（推 tag 时同时附到 Release）。
+#
+# 说明：本文件的构建逻辑与 scripts/verify.mjs、package.json 的 package:win 保持一致，
+# 但**没有在 CI 里实际跑过**（本地无 GitHub Actions 运行器），首次运行时请留意日志。
+
+name: Build Windows installers
+
+on:
+  # 手动触发：Actions 页面点 "Run workflow"
+  workflow_dispatch:
+  # 推 v* 标签时自动构建并附到 Release
+  push:
+    tags:
+      - 'v*'
+  # 改到打包相关文件时先跑一次，避免发版当天才发现问题
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - 'packaging/**'
+      - '.github/workflows/build-windows.yml'
+      - 'pnpm-lock.yaml'
+
+# 默认只读；附带 Release 需要写权限，因此在 job 级别放开 contents: write
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        # 版本取自 package.json 的 packageManager 字段，避免两处漂移
+        uses: pnpm/action-setup@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: 安装依赖
+        # Windows 上不需要跳过 Electron 二进制：桌面端打包本来就要用它
+        run: pnpm install --frozen-lockfile
+
+      - name: 类型检查
+        run: pnpm typecheck
+
+      - name: 单元与端到端测试
+        run: pnpm test
+
+      - name: 构建 Web 与服务端产物
+        run: pnpm build:app
+
+      - name: 构建 Windows 安装包（x64 + arm64）
+        run: pnpm --filter @peanutsprout/desktop exec electron-builder --win nsis --x64 --arm64
+        env:
+          # 不签名：没有证书时 electron-builder 会跳过签名，但必须显式关掉
+          # 自动发现证书的行为，否则某些机器上会因找不到证书而失败
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: 生成校验和
+        shell: pwsh
+        run: |
+          # 与 release/SHA256SUMS.txt 同格式：<sha256>  <文件名>
+          $files = Get-ChildItem -Path release -Filter '*.exe' -File
+          if ($files.Count -eq 0) {
+            Write-Error '未找到任何 .exe 产物，打包步骤可能静默失败了'
+            exit 1
+          }
+          $lines = foreach ($f in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -Path $f.FullName).Hash.ToLower()
+            "$hash  $($f.Name)"
+          }
+          # UTF-8 无 BOM，避免校验和文件里带出 Windows 特有的 BOM
+          [System.IO.File]::WriteAllLines(
+            (Join-Path $PWD 'release/SHA256SUMS-windows.txt'),
+            $lines,
+            (New-Object System.Text.UTF8Encoding $false)
+          )
+          Get-Content release/SHA256SUMS-windows.txt
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: peanutsprout-windows-installers
+          # 只传安装包与校验和，不传中间目录（解包后的 app 有几百 MB）
+          path: |
+            release/*.exe
+            release/SHA256SUMS-windows.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 附加到 Release
+        # 只在推 tag 时执行；需要写权限，所以单独给这一步
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.exe
+            release/SHA256SUMS-windows.txt
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -11,6 +11,22 @@ import { resolveDataDir } from '@peanutsprout/core';
 export interface ServerConfig {
   host: string;
   port: number;
+  /**
+   * host / port 是否由部署方**显式指定**（环境变量或 loadConfig 的 overrides）。
+   *
+   * 只在为 false 时，界面上的「允许局域网访问」设置才参与决定实际绑定地址。
+   * 这条优先级的理由：`PEANUTSPROUT_HOST/PORT` 是 systemd/容器/桌面端主进程
+   * 对"监听在哪"的硬性要求（桌面端还要靠它做实例身份校验），
+   * 若能被人改一个界面开关就覆盖掉，运维的绑定策略与桌面端的端口探测都会失效。
+   * 反过来说，桌面端想让界面开关生效，就得自己先读设置、再以环境变量传入。
+   *
+   * 为什么是可选：loadConfig 一定会填上真实取值；而单测里手写的配置字面量
+   * 只关心被断言的那几个字段，强制它们写这两个开关纯属噪音。
+   * 缺省（undefined）按 false 处理 —— 即"没有显式指定"，与引入本特性之前
+   * 的行为一致，是这里唯一安全的默认方向。
+   */
+  hostExplicit?: boolean;
+  portExplicit?: boolean;
   /** 数据目录 ~/.peanutsprout/ */
   dataDir: string;
   /**
@@ -99,9 +115,16 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
   const keyPath = envStr('PEANUTSPROUT_TLS_KEY');
   const certPath = envStr('PEANUTSPROUT_TLS_CERT');
 
+  const envHost = envStr('PEANUTSPROUT_HOST');
+  const envPort = envStr('PEANUTSPROUT_PORT');
+
   const base: ServerConfig = {
-    host: envStr('PEANUTSPROUT_HOST') ?? '127.0.0.1',
+    host: envHost ?? '127.0.0.1',
     port: envInt('PEANUTSPROUT_PORT', 8787),
+    // 显式指定 = 环境变量或调用方 overrides 给了值。两者都算"部署方的硬要求"，
+    // 只有都没有时，界面上的局域网访问设置才能改变绑定地址。
+    hostExplicit: envHost !== undefined || overrides.host !== undefined,
+    portExplicit: envPort !== undefined || overrides.port !== undefined,
     dataDir: resolveDataDir(),
     masterPassword: envStr('PEANUTSPROUT_MASTER_PASSWORD') ?? null,
     instanceNonce: envStr('PEANUTSPROUT_INSTANCE_NONCE') ?? null,

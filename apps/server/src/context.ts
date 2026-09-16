@@ -14,6 +14,11 @@ import { AiService } from '@peanutsprout/ai';
 import { MigrationEngine, MigrationService } from '@peanutsprout/migration';
 import { ensureAdminUser, openPeanutDatabase, type PeanutDatabase } from '@peanutsprout/storage';
 import type { ServerConfig } from './config.js';
+import {
+  readWebAccessSettings,
+  resolveWebBinding,
+  type WebBinding,
+} from './lib/web-access.js';
 
 export interface AppContext {
   config: ServerConfig;
@@ -33,6 +38,16 @@ export interface AppContext {
    */
   idleReaper: NodeJS.Timeout | null;
   startedAt: number;
+  /**
+   * 本次启动**实际**绑定的地址与端口，由 createContext 解析、main.ts 在 listen
+   * 之后回填真实端口。
+   *
+   * 为什么不直接用 config.host/port：端口可能传 0（由系统分配），
+   * 此时只有 listen 成功后才能知道真实值；而界面要显示"现在能从哪里访问"，
+   * 显示 config 里的 0 毫无意义。另外 config 是"请求绑定到哪"，
+   * binding 是"实际绑定到哪并对外开放到什么程度"，两者在局域网开关场景下并不相等。
+   */
+  binding: WebBinding;
 }
 
 export interface CreateContextOptions {
@@ -54,6 +69,19 @@ export function createContext(options: CreateContextOptions): AppContext {
   const bootstrap = ensureAdminUser(pdb, {
     username: config.bootstrapAdminUsername,
     ...(config.bootstrapAdminPassword ? { password: config.bootstrapAdminPassword } : {}),
+  });
+
+  // 绑定地址在这里解析（而不是 buildServer 里）：pdb 此时已经打开，
+  // 设置项可读；而 buildServer 是纯装配，不该再回头读数据库。
+  // config.hostExplicit/portExplicit 为真时（环境变量或调用方显式指定）
+  // 一律以它为准，界面上的局域网开关不参与 —— 见 config.ts 的字段注释。
+  const webSettings = readWebAccessSettings((key) => pdb.settings.get(key));
+  const binding = resolveWebBinding({
+    envHost: config.hostExplicit ? config.host : undefined,
+    envPort: config.portExplicit ? config.port : undefined,
+    settings: webSettings,
+    defaultHost: config.host,
+    defaultPort: config.port,
   });
 
   const registry = createDefaultRegistry();
@@ -90,6 +118,12 @@ export function createContext(options: CreateContextOptions): AppContext {
     status: 'success',
     detail: {
       port: config.port,
+      // 实际绑定与"是否已对局域网开放"一并留痕：事后追查"这个实例当时是不是
+      // 暴露在局域网上的"时，光看 config.port 是回答不了的（端口可能被系统分配，
+      // 且局域网开关会改变绑定地址）。
+      bindHost: binding.host,
+      bindPort: binding.port,
+      lanEnabled: binding.lanEnabled,
       schemaVersion: pdb.init.schemaVersion,
       appliedMigrations: pdb.init.applied,
       driverImplemented: registry.implementedTypes(),
@@ -107,6 +141,7 @@ export function createContext(options: CreateContextOptions): AppContext {
     bootstrap,
     idleReaper,
     startedAt: Date.now(),
+    binding,
   };
 }
 

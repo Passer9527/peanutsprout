@@ -6,6 +6,99 @@
 
 ---
 
+## 第五轮：Web 页面访问开关、Windows 安装向导（路径与快捷方式可选）、发布到 GitHub
+
+需求原文：「最好可以设置是否启用 web 页面，去吧 windows 安装程序也封装好，
+安装时能修改默认安装路径、选择是否创建快捷方式到桌面和开始菜单。」
+（其中"是否启用 web 页面"经确认为 **控制「是否允许局域网浏览器访问」**。）
+
+### 新增
+
+- **「局域网访问（Web 页面）」开关**（`GET /meta/web-access` + 设置项
+  `web.lan_enabled` / `web.lan_port`，界面在「设置」页，仅管理员可见）。
+
+  **这不是"要不要提供 Web 页面"的开关**：Web 页面始终提供——桌面端自己的窗口就加载
+  `http://127.0.0.1:<port>/`，关掉它桌面端会白屏。这里控制的是**是否允许局域网内
+  其它设备用浏览器访问**。
+
+  三处刻意的设计：
+
+  - **保存 ≠ 生效，接口如实分开返回。** 绑定地址与端口只能在 `listen` 之前决定，
+    所以响应里 `saved` 与 `effective` 是两个字段，另有 `restartRequired`。
+    只回设置项会让界面出现"显示已开启、实际连不上"的假象——用户把网址发给同事、
+    对方打不开，却查不出原因。界面据此把"当前实际生效"与"需重启"并排显示。
+  - **`effective.host` 永远不回传 `0.0.0.0`。** 通配地址贴到界面上用户没法拿它访问，
+    会被换成 `127.0.0.1`；是否真的对外开放由 `effective.lanEnabled` 如实表达。
+  - **风险提示取"已生效 或 已保存将生效"的并集。** 用户刚打开开关、还没重启的那一刻，
+    恰恰是他最该先看到风险的时候（尤其 `default_password`：还有人用初始口令）。
+    只看已生效的绑定，就等于"先把弱口令的服务暴露到局域网，再告诉他不该这么做"。
+    提示三类：`lan_exposed` / `no_https` / `default_password`。
+
+  **优先级**：`PEANUTSPROUT_HOST` / `PEANUTSPROUT_PORT` **高于**这两个设置项。
+  它们是 systemd/容器/桌面端主进程对"监听在哪"的硬性要求，若能被人改一个界面开关
+  就覆盖掉，运维的绑定策略与桌面端的端口探测都会失效。桌面端要让界面开关生效，
+  就得自己先读设置、再以环境变量传给子进程。
+
+  桌面端为此新增零依赖的 `apps/desktop/web-access.mjs`：直接以只读方式打开本地
+  SQLite 读设置（打包态没有 `node_modules`，无法复用 TS 源码），
+  开启时绑 `0.0.0.0` + 固定端口，关闭时保持原有的回环 + 随机端口行为。
+  端口被占用时**明确报错并提示到「设置 → Web 页面访问」换端口，不静默换端口**——
+  静默换会让用户手里的地址悄悄失效。
+
+- **Windows 安装向导可选安装路径与快捷方式**
+  （`packaging/windows/installer.nsh` + `apps/desktop/electron-builder.yml`）。
+  「选择安装位置」由 `oneClick: false` + `allowToChangeInstallationDirectory: true`
+  提供；快捷方式则是新增的自定义向导页（`customPageAfterChangeDir`），
+  两个复选框默认勾选，按勾选结果创建桌面 / 开始菜单快捷方式，静默安装（`/S`）
+  按"默认都创建"处理。
+
+  这里有一个必须自己兜住的坑：electron-builder 的
+  `createDesktopShortcut` / `createStartMenuShortcut` 只有"建"和"不建"两种取值，
+  **没有"让用户选"**，所以必须把两者设为 `false`。但那会让模板定义
+  `DO_NOT_CREATE_*_SHORTCUT`，而同一个宏**也让卸载器整段跳过快捷方式清理**——
+  于是自己创建的快捷方式在卸载后会残留成删不掉的孤儿。因此
+  `customUnInstall` 里显式删除，并且顺手清掉旧名字留下的那个。
+
+- **GitHub Actions 工作流** `.github/workflows/build-windows.yml`：在
+  `windows-latest` 上构建 x64 与 arm64 的 NSIS 安装包、生成校验和、
+  推 `v*` 标签时附到 Release。
+
+### 修复
+
+- 删除 `apps/desktop/port-util.mjs` 里一段**错位的文档注释**：它描述的是
+  `resolveDataDir`，却紧贴在 `verifyInstanceNonce` 的注释上方；而该函数早已不在
+  这个文件里（现在在 `web-access.mjs` 并有自己的说明）。
+- `apps/desktop/package.json` 的 `typecheck` 没有包含 `web-access.mjs`，
+  即新增的桌面端模块不会被任何检查覆盖；已补上。
+
+### 已知限制（如实记录）
+
+- **本次没能产出可用的 Windows 安装包。** 安装包脚本本身**已验证能编译通过**
+  （makensis 无任何 warning/error；electron-builder 把 warning 当 error，
+  所以"零 warning"即编译合格的硬证据），但构建卡在最后一步：electron-builder
+  在 Linux 上必须**运行** NSIS 生成的卸载器生成器（靠 wine）才能产出
+  `uninstall.exe`。本机既无系统 wine（`sudo` 需交互口令，无法安装），
+  而 electron-builder 自带下载的 wine 工具链是**残缺的**：
+  `wine@1.0.0` / `wine@1.0.1` 提供的 `wine-11.0-linux-x86_64.tar.xz`（约 30 MB）
+  只有 unix 侧的 `lib/wine/x86_64-unix`，**完全没有 PE 侧的
+  `lib/wine/x86_64-windows`**——完整安装应有 700+ 个 DLL，它只有 26 个，
+  且缺 `kernel32.dll` 与 apiset，因此无法运行任何 Windows 程序，必然失败于
+  `wine: failed to load .../x86_64-unix/ntdll.dll error c0000135`
+  （解包核对过压缩包内容，排除了下载截断）。这也是新增上面那个工作流的原因：
+  回到 Windows 上构建，就没有 wine 这一环。
+  构建中途产生的 172 KB `release/PeanutSprout-Setup-0.1.0-win-x64.exe` 是
+  `BUILD_UNINSTALLER` 中间产物（真正安装包约 80–100 MB），**不是可用安装包**，已删除。
+- 该工作流**尚未在真实 GitHub Actions 运行器上跑过**（本机没有运行器），
+  首次运行请留意日志。
+- 新增的「局域网访问」界面**从未在真实浏览器里点过**（仓库未装 DOM 测试环境，
+  也不打算为此引入）：`WebAccessCard.tsx` 的渲染与交互只有类型检查、
+  服务端接口的端到端测试、以及纯函数单测覆盖，没有 DOM 断言。
+- 「局域网内其它设备真能打开页面」**未经真实第二台设备验证**。服务端 CORS 放行的
+  是同源与 `localhost`/`127.0.0.1`/`::1` 且无 `Origin` 的请求；局域网访问属于
+  浏览器同源请求，理论上不受 CORS 限制，但这条只是推理，没有实测。
+
+---
+
 ## 第四轮：表数据编辑器、可视化建库建表、深色皮肤不跟随换肤的根因修复
 
 需求原文：「还差一个功能，就是选中一个表，可以像 excel 一样，操作这张表。删除、插入、修改、查看记录。

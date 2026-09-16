@@ -111,6 +111,41 @@ const messages: Partial<Record<MessageKeyWithPlurals, string>> = {
   'admin.settings.about.stackValue':
     'React 19 · TypeScript 5.9 · Vite 7 (no third-party UI / state / routing / chart libraries)',
 
+  // —— Settings: LAN access (web page) ——
+  'admin.webAccess.title': 'LAN access (web page)',
+  'admin.webAccess.subtitle':
+    'When enabled, other devices on the same local network can open this tool in a browser. When disabled, the server listens only on 127.0.0.1 and is reachable from this machine alone.',
+  'admin.webAccess.toggle.label': 'Allow LAN access',
+  'admin.webAccess.toggle.hint':
+    'When off, the server binds 127.0.0.1 only and other machines cannot connect.',
+  'admin.webAccess.port.label': 'Access port',
+  'admin.webAccess.port.hint':
+    'Range 1024–65535. Once enabled the port stays fixed, so URLs you share keep working.',
+  'admin.webAccess.port.err': 'The port must be an integer between 1024 and 65535.',
+  'admin.webAccess.save': 'Save settings',
+  'admin.webAccess.saving': 'Saving…',
+  'admin.webAccess.current.title': 'Currently in effect',
+  'admin.webAccess.current.on': 'LAN access open · {host}:{port}',
+  'admin.webAccess.current.off': 'This machine only · {host}:{port}',
+  'admin.webAccess.restart.title': 'Restart required',
+  'admin.webAccess.restart.body':
+    'The listening address and port are fixed at startup. Your settings are saved; restart PeanutSprout for the new address to take effect.',
+  'admin.webAccess.url.title': 'Available addresses',
+  'admin.webAccess.url.empty': 'No LAN address detected. Please check your network connection.',
+  'admin.webAccess.copy': 'Copy',
+  'admin.webAccess.copied': 'Address copied to the clipboard.',
+  'admin.webAccess.embedded':
+    'The desktop window always connects over 127.0.0.1 and is unaffected by this switch; this controls whether other devices on the LAN may connect.',
+  'admin.webAccess.warn.lan_exposed':
+    'LAN access is open: anyone on the same network can reach the sign-in page. Make sure your passwords are strong and enable this only on networks you trust.',
+  'admin.webAccess.warn.no_https':
+    'Traffic is plain HTTP, so passwords and query results can be sniffed on the local network. Use this only on a trusted intranet.',
+  'admin.webAccess.warn.default_password':
+    'Some accounts still use the initial password. Change those passwords before opening LAN access.',
+  'admin.webAccess.err.load': 'Failed to load LAN settings: {message}',
+  'admin.webAccess.err.save': 'Failed to save LAN settings: {message}',
+  'admin.webAccess.err.copy': 'Copy failed. Please select the address and copy it manually.',
+
   // —— Toast ——
   'admin.toast.close': 'Dismiss notification',
 };

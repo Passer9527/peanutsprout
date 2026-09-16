@@ -11,6 +11,7 @@ import { PRODUCT } from '@peanutsprout/core';
 import { buildServer } from './app.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { createContext, disposeContext, type AppContext } from './context.js';
+import { WILDCARD_HOST } from './lib/web-access.js';
 
 export interface StartServerResult {
   app: Awaited<ReturnType<typeof buildServer>>;
@@ -56,15 +57,31 @@ export async function startServer(overrides: Partial<ServerConfig> = {}): Promis
   const app = await buildServer(ctx);
 
   try {
-    await app.listen({ host: config.host, port: config.port });
+    // 监听地址取自 ctx.binding 而不是 config：config 是"请求绑到哪"，
+    // binding 已经把界面上的「允许局域网访问」设置解析进去（见 lib/web-access.ts）。
+    await app.listen({ host: ctx.binding.host, port: ctx.binding.port });
   } catch (e) {
     await disposeContext(ctx);
     throw e;
   }
 
+  // 端口传 0 时由系统分配，只有 listen 成功后才能拿到真实值。
+  // 界面要显示"现在能从哪里访问"，必须回填，否则会显示 :0。
+  const address = app.server.address();
+  if (address !== null && typeof address === 'object') {
+    ctx.binding = { ...ctx.binding, port: address.port };
+  }
+
   const scheme = config.https ? 'https' : 'http';
-  const url = `${scheme}://${config.host === '0.0.0.0' ? '127.0.0.1' : config.host}:${config.port}`;
+  // 通配绑定时对外地址不能写成 0.0.0.0（那不是一个可访问的地址）
+  const displayHost = ctx.binding.host === '0.0.0.0' ? '127.0.0.1' : ctx.binding.host;
+  const url = `${scheme}://${displayHost}:${ctx.binding.port}`;
   app.log.info(banner(ctx, url));
+  app.log.info(
+    ctx.binding.lanEnabled
+      ? `已允许局域网访问：监听 ${WILDCARD_HOST}:${ctx.binding.port}，同网段的设备可用浏览器访问本机 IP 的该端口`
+      : `仅本机可访问：监听 ${ctx.binding.host}:${ctx.binding.port}（如需手机/其他电脑访问，在「设置 → Web 页面访问」中开启局域网访问并重启）`,
+  );
 
   let closed = false;
   const close = async (): Promise<void> => {

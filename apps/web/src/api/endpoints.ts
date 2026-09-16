@@ -58,6 +58,7 @@ import type {
   TableDTO,
   UpdateUserInput,
   UserDTO,
+  WebAccessDTO,
   WritableSettingDTO,
 } from './types';
 
@@ -150,6 +151,16 @@ export const queryApi = {
 export const metaApi = {
   dbTypes(): Promise<ItemsResponse<DbTypeDTO>> {
     return request<ItemsResponse<DbTypeDTO>>('/meta/db-types');
+  },
+  /**
+   * Web 页面（局域网）访问状态。
+   *
+   * 与设置项分开取：设置项只有"用户存了什么"，而这里额外给出
+   * **本次进程实际绑定到哪**、需不需要重启、以及可以贴给别人的地址。
+   * 只依赖 settingsApi 会让界面无法区分"已保存"和"已生效"。
+   */
+  webAccess(): Promise<WebAccessDTO> {
+    return request<WebAccessDTO>('/meta/web-access');
   },
 };
 

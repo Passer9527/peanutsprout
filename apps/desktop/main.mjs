@@ -24,6 +24,12 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, dialog, shell } from 'electron';
 import { pickFreePort, verifyInstanceNonce } from './port-util.mjs';
+import {
+  readWebAccessSettingsFromDb,
+  resolveDataDir,
+  resolveDbPath,
+  resolveDesktopBinding,
+} from './web-access.mjs';
 
 const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -79,7 +85,7 @@ function resolveServerLaunch() {
 }
 
 /** 把服务端以子进程方式拉起（开发态 tsx / 打包态 esbuild 产物）。 */
-function startEmbeddedServer(port, launch, instanceNonce) {
+function startEmbeddedServer(host, port, launch, instanceNonce) {
   // 绝不把内嵌服务的 CORS 设成星号。
   //
   // 星号意味着用户在浏览器里打开的**任意网页**都能跨源读取本地 API 的响应，
@@ -100,7 +106,7 @@ function startEmbeddedServer(port, launch, instanceNonce) {
       ...env,
       // 关键：以 Node 身份运行，而不是再开一个 Electron 实例
       ELECTRON_RUN_AS_NODE: '1',
-      PEANUTSPROUT_HOST: HOST,
+      PEANUTSPROUT_HOST: host,
       PEANUTSPROUT_PORT: String(port),
       PEANUTSPROUT_SERVE_WEB: 'true',
       // 服务端会在 /health 回显它，主进程据此确认应答者身份
@@ -233,12 +239,22 @@ async function bootstrap() {
   if (!serverProcess) {
     try {
       const launch = resolveServerLaunch();
-      // 端口由系统随机分配，避免与"别的用户已经占用的 8787"撞车后把窗口交给别人的服务
-      const port = await pickFreePort(HOST);
+      // 是否允许局域网访问、用哪个端口，由本地库里的设置决定（见 web-access.mjs）。
+      // 关闭时沿用"向系统要一个空闲端口"，避免与别的实例撞车、
+      // 也让本机其他程序无法猜到地址；打开时改用固定端口，好让用户把网址
+      // 发到手机/同事那边（端口每次变的话对方就打不开了）。
+      const dataDir = resolveDataDir();
+      const webSettings = readWebAccessSettingsFromDb(resolveDbPath(dataDir));
+      const binding = await resolveDesktopBinding({
+        settings: webSettings,
+        freePortPicker: (bindHost) => pickFreePort(bindHost),
+        fallbackPort: undefined,
+      });
+      const port = binding.port;
       // 每次启动生成一次性实例标识，用于确认端口上应答的是本次启动的子进程
       const instanceNonce = randomBytes(24).toString('hex');
 
-      const child = startEmbeddedServer(port, launch, instanceNonce);
+      const child = startEmbeddedServer(binding.host, port, launch, instanceNonce);
       serverProcess = child;
       serverPort = port;
 
@@ -246,14 +262,26 @@ async function bootstrap() {
         waitForHealth(port, HEALTH_TIMEOUT_MS, instanceNonce),
         waitForChildExit(child),
       ]);
-      diagnostics.push(`服务已就绪：${health.product} v${health.version}（${HOST}:${port}）`);
+      diagnostics.push(`服务已就绪：${health.product} v${health.version}（${binding.host}:${port}）`);
+      if (binding.lanEnabled) {
+        diagnostics.push(
+          `已允许局域网访问：同网段的设备可用浏览器打开本机 IP 的 ${port} 端口；` +
+            '关闭请在「设置 → Web 页面访问」中操作并重启花生苗。',
+        );
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      // 开启局域网访问时端口是固定的，被占用不会自动改端口（改了用户的网址就失效），
+      // 因此这里要给出可执行的下一步，而不是只抛一句 EADDRINUSE。
+      const occupied =
+        app.isPackaged && /EADDRINUSE/i.test(message)
+          ? '\n\n该端口已被其他程序占用。请到「设置 → Web 页面访问」换一个端口后重启花生苗。'
+          : '';
       const hint = app.isPackaged
         ? '安装包可能不完整：请确认 resources/server/server.mjs 与 resources/web 存在，并查看系统日志中的 [server] 输出。'
         : '请确认依赖已安装（pnpm install）与服务端源码可编译，或查看终端中的 [server] 日志。';
       killServerProcess();
-      dialog.showErrorBox('花生苗启动失败', `${message}\n\n${hint}`);
+      dialog.showErrorBox('花生苗启动失败', `${message}${occupied}\n\n${hint}`);
       app.quit();
       return;
     }

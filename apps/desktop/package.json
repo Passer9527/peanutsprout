@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "node scripts/launch.mjs",
     "start": "node scripts/launch.mjs",
-    "typecheck": "node --check main.mjs && node --check port-util.mjs && node --check scripts/launch.mjs",
+    "typecheck": "node --check main.mjs && node --check port-util.mjs && node --check web-access.mjs && node --check scripts/launch.mjs",
     "build:server": "node ../../scripts/build-server.mjs",
     "package:dir": "electron-builder --dir",
     "package:linux": "electron-builder --linux --x64 --arm64",

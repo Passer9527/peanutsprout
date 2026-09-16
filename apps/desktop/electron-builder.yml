@@ -46,6 +46,30 @@ directories:
 electronDownload:
   mirror: https://registry.npmmirror.com/-/binary/electron/
 
+# ── 关于在非 Windows 主机上打 Windows 包（实测结论，别再走这条路）────────────────
+#
+# electron-builder 打 Windows 目标时，最后一步要在非 Windows 主机上**运行**由 NSIS
+# 先产出的"卸载器生成器"，才能得到真正的 uninstall.exe。这一步必须靠 wine：
+#   Linux 上默认回退到**系统 wine**（未安装时直接 `spawn wine ENOENT`，
+#   报错里完全看不出是在等 wine）；macOS 上下载它自带的 wine-4.0.1。
+#
+# 曾试图用 `toolsets: { wine: '1.0.1' }` 指定自带 wine-11.0 来摆脱对系统的依赖。
+# **实测该工具链是残缺的，此路不通**：`wine@1.0.0` / `wine@1.0.1` 提供的
+# wine-11.0-linux-x86_64.tar.xz（约 30 MB）只有 unix 侧的 lib/wine/x86_64-unix，
+# 完全没有 PE 侧的 lib/wine/x86_64-windows —— 完整安装应有 700+ 个 DLL，
+# 它只有 26 个，且缺 kernel32.dll 与 apiset。解包核对该压缩包确认不是下载截断。
+# 结果：连 `wine cmd /c echo` 都跑不起来，构建必然止步于
+#   wine: failed to load .../x86_64-unix/ntdll.dll error c0000135
+# （`wine --version` 能打印版本号，因为那一步不需要 PE 侧，容易误判成"wine 可用"。）
+#
+# 所以这里**刻意不声明 toolsets.wine**：声明了也只是每次构建白下 30 MB 坏包。
+# Windows 安装包请在 Windows 上构建，见 .github/workflows/build-windows.yml
+# （windows-latest，x64 + arm64）或本地 Windows 机器跑 `pnpm package:win`。
+# Windows 主机上本来就不需要 wine：WineVmManager.execWine 检测到 win32 会直接跑原生 exe。
+#
+# 注意：NSIS 编译器（nsis@3.0.4.1）与 winCodeSign 是**另一回事**，它们在 Linux 上
+# 也能正常工作，本仓库的 .npmrc 已用 electron_builder_binaries_mirror 指向国内镜像。
+
 # 入包内容：只有 Electron 外壳本身（main.mjs + port-util.mjs + package.json）。
 # 为什么一个 node_modules 都不带：服务端已被 esbuild 内联成单文件
 # （scripts/build-server.mjs -> build/server.mjs），桌面端运行时不需要任何 npm 依赖。
@@ -53,9 +77,11 @@ electronDownload:
 # 把整个 .pnpm store（数百 MB）拖进安装包。
 files:
   - main.mjs
-  # main.mjs 依赖的纯 Node 辅助模块（随机端口/身份校验，无第三方依赖）。
-  # 必须是相对 apps/desktop 的路径，且不能漏——漏了打包态会 ERR_MODULE_NOT_FOUND。
+  # main.mjs 依赖的纯 Node 辅助模块（随机端口 / 实例身份校验 / 局域网访问设置读取，
+  # 均无第三方依赖）。必须是相对 apps/desktop 的路径，且不能漏——
+  # 漏了打包态会 ERR_MODULE_NOT_FOUND。
   - port-util.mjs
+  - web-access.mjs
   - package.json
   - '!node_modules/**'
   - '!**/*.map'
@@ -101,9 +127,16 @@ nsis:
   # 不做一键静默安装：允许用户选目录，避免装到没有权限的位置
   oneClick: false
   perMachine: false
+  # 安装向导里显示「选择安装位置」页，用户可改默认安装路径
   allowToChangeInstallationDirectory: true
-  createDesktopShortcut: true
-  createStartMenuShortcut: true
+  # 这两个必须为 false：electron-builder 只在"建"与"不建"之间二选一，
+  # 没有"让用户选"。关掉它的自动创建后，由 packaging/windows/installer.nsh
+  # 增加一个自定义页让用户勾选，并按结果创建/清理。
+  # ⚠️ 关掉它们同时会让**卸载器**跳过内建快捷方式清理（见 uninstaller.nsh 的
+  #    !ifndef DO_NOT_CREATE_*_SHORTCUT），所以 installer.nsh 的 customUnInstall
+  #    里自己删了。改动这两行前请先读那个文件的注释。
+  createDesktopShortcut: false
+  createStartMenuShortcut: false
   shortcutName: 花生苗数据库管理工具
   uninstallDisplayName: 花生苗数据库管理工具 (PeanutSprout)
   installerLanguages:
@@ -111,7 +144,7 @@ nsis:
     - en_US
   # 卸载时**保留** %USERPROFILE%\.peanutsprout（连接密文/主密钥/审计都在里面）
   deleteAppDataOnUninstall: false
-  # 自定义卸载提示：明确告知数据目录位置，避免用户以为"卸载=清干净"
+  # 自定义安装向导页（快捷方式勾选）与卸载提示，见该文件头部注释
   include: ../windows/installer.nsh
   # 安装向导展示 AGPL-3.0 全文
   license: ../../LICENSE

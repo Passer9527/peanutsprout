@@ -485,5 +485,10 @@ INSERT OR IGNORE INTO settings (key, value, category) VALUES
 ('security.auto_lock_minutes', '30', 'security'),
 ('ai.enabled',             'false',  'ai'),
 ('ai.redaction_enabled',   'true',   'ai'),
-('ai.production_write_allowed', 'false', 'ai');
+('ai.production_write_allowed', 'false', 'ai'),
+-- Web 页面访问控制。默认关闭：桌面端与一体化部署默认只绑 127.0.0.1，
+-- 同网段的其他设备无法访问；显式打开后改为绑 0.0.0.0 并改用固定端口。
+-- 端口与开关都是**启动时读取**，改动后需重启进程才生效。
+('web.lan_enabled',        'false',  'web'),
+('web.lan_port',           '8787',   'web');
 `;

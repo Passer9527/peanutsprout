@@ -5,12 +5,22 @@
  */
 
 import { z } from 'zod';
+import { networkInterfaces } from 'node:os';
 import { BUILTIN_PERMISSIONS, PeanutError, PRODUCT } from '@peanutsprout/core';
 import { assertConnectionVisible, isProductionConnection } from '@peanutsprout/auth';
 import { MIN_PASSWORD_LENGTH, WRITABLE_SETTINGS, readMustChangePassword } from '@peanutsprout/storage';
 import type { FastifyInstance } from 'fastify';
 import type { AppContext } from '../context.js';
 import { authOf, clientIp, parse, requireAuth, userAgent } from '../http.js';
+import {
+  buildAccessUrls,
+  isRestartRequired,
+  lanIPv4Addresses,
+  LOOPBACK_HOST,
+  readWebAccessSettings,
+  WILDCARD_HOST,
+  webAccessWarnings,
+} from '../lib/web-access.js';
 
 /** 把白名单整理成界面可直接渲染的列表（类型与范围一并带出，避免前端再抄一份）。 */
 function LIST_WRITABLE_SETTINGS(): Array<{
@@ -220,6 +230,64 @@ export async function registerMetaRoutes(app: FastifyInstance, ctx: AppContext):
   /** 列出可写设置项及其类型/范围，让界面不必硬编码一份白名单。 */
   app.get('/meta/settings/writable', { preHandler: requireAuth(ctx, 'settings.manage') }, async (_req, reply) => {
     return reply.send({ items: LIST_WRITABLE_SETTINGS() });
+  });
+
+  /**
+   * Web 页面访问状态：现在能不能被局域网访问、保存的设置是否已生效、该从哪个网址进。
+   *
+   * 为什么单独做一个接口，而不是让界面自己读两个设置项拼：
+   *   界面真正需要回答的是"我**现在**能从哪里访问"，这既取决于保存的设置，
+   *   也取决于本次进程实际绑定到了哪个地址/端口（端口可能由系统分配），
+   *   还取决于主机上有哪些网卡。只回 `web.lan_enabled=true` 是不够的 ——
+   *   用户改完设置后页面显示"已开启"，但进程还没重启、实际仍只绑在回环上，
+   *   这时给一个假的"已开启"比不给更糟。所以这里同时回传 saved / effective /
+   *   restartRequired / urls，让界面能如实区分"已保存"和"已生效"。
+   *
+   * 权限沿用 settings.manage：本接口会回传主机网卡地址，属于不该给普通用户看的信息。
+   */
+  app.get('/meta/web-access', { preHandler: requireAuth(ctx, 'settings.manage') }, async (_req, reply) => {
+    const settings = readWebAccessSettings((key) => ctx.pdb.settings.get(key));
+    const { binding } = ctx;
+    const scheme = ctx.config.https ? 'https' : 'http';
+    const addresses = lanIPv4Addresses(networkInterfaces());
+
+    // "还有人没改初始口令"作为风险提示之一：默认口令 + 局域网可访问是最危险的组合。
+    const hasDefaultPasswordUser = ctx.pdb.users
+      .list()
+      .some((user) => readMustChangePassword(ctx.pdb, user.id));
+
+    return reply.send({
+      saved: { lanEnabled: settings.lanEnabled, lanPort: settings.lanPort },
+      effective: {
+        lanEnabled: binding.lanEnabled,
+        // 通配绑定地址（0.0.0.0）贴到界面上没有任何意义，用户没法拿它访问，
+        // 这里换成可读的回环地址；"是否真的对外开放"由上面的 lanEnabled 表达。
+        host: binding.host === WILDCARD_HOST ? LOOPBACK_HOST : binding.host,
+        port: binding.port,
+        scheme,
+      },
+      // 保存的设置与本次启动实际生效的是否不一致 → 界面提示"需重启生效"
+      restartRequired: isRestartRequired(settings, binding),
+      // 关闭时只给回环地址：此时局域网地址给出去也没用，只会让人误以为能访问
+      urls: buildAccessUrls({
+        lanEnabled: settings.lanEnabled,
+        scheme,
+        port: settings.lanEnabled ? settings.lanPort : binding.port,
+        lanAddresses: addresses,
+      }),
+      lanAddresses: addresses,
+      warnings: webAccessWarnings({
+        // 取"已生效"与"已保存将生效"的**并集**，而不是只看已生效的那个。
+        // 理由：用户刚打开开关、还没重启的那一刻，恰恰是他最该先看到风险的时候 ——
+        // 尤其 default_password（还有人用初始口令）。若等重启后才提示，
+        // 就等于"先把弱口令的服务暴露到局域网，再告诉他不该这么做"。
+        lanEnabled: binding.lanEnabled || settings.lanEnabled,
+        scheme,
+        hasDefaultPasswordUser,
+      }),
+      // 桌面端内嵌服务会把实例标识传进来；界面据此说明"桌面端窗口不受此开关影响"
+      embedded: ctx.config.instanceNonce !== null,
+    });
   });
 
   /**

@@ -101,6 +101,40 @@ const messages: Partial<Record<MessageKeyWithPlurals, string>> = {
   'admin.settings.about.stack': 'Web 기술 스택',
   'admin.settings.about.stackValue': 'React 19 · TypeScript 5.9 · Vite 7(서드파티 UI / 상태 / 라우팅 / 차트 라이브러리 미사용)',
 
+  // —— 설정: LAN 접속(Web 페이지) ——
+  'admin.webAccess.title': 'LAN 접속(Web 페이지)',
+  'admin.webAccess.subtitle':
+    '켜면 같은 LAN에 있는 다른 기기에서 브라우저로 이 도구에 접속할 수 있습니다. 끄면 127.0.0.1만 수신하므로 이 컴퓨터에서만 사용할 수 있습니다.',
+  'admin.webAccess.toggle.label': 'LAN 접속 허용',
+  'admin.webAccess.toggle.hint': '끄면 127.0.0.1에만 바인딩되어 다른 기기에서는 접속할 수 없습니다.',
+  'admin.webAccess.port.label': '접속 포트',
+  'admin.webAccess.port.hint':
+    '범위는 1024–65535입니다. 켜면 포트가 고정되므로 공유한 주소가 계속 유효합니다.',
+  'admin.webAccess.port.err': '포트는 1024~65535 사이의 정수여야 합니다.',
+  'admin.webAccess.save': '설정 저장',
+  'admin.webAccess.saving': '저장 중…',
+  'admin.webAccess.current.title': '현재 실제 적용 중',
+  'admin.webAccess.current.on': 'LAN에 공개됨 · {host}:{port}',
+  'admin.webAccess.current.off': '이 컴퓨터에서만 접속 가능 · {host}:{port}',
+  'admin.webAccess.restart.title': '재시작 후 적용됩니다',
+  'admin.webAccess.restart.body':
+    '수신 주소와 포트는 시작할 때 결정됩니다. 설정은 저장되었으며, 새 주소를 적용하려면 花生苗를 다시 시작하세요.',
+  'admin.webAccess.url.title': '사용 가능한 접속 주소',
+  'admin.webAccess.url.empty': 'LAN 주소를 찾지 못했습니다. 네트워크 연결을 확인하세요.',
+  'admin.webAccess.copy': '복사',
+  'admin.webAccess.copied': '주소를 클립보드에 복사했습니다.',
+  'admin.webAccess.embedded':
+    '데스크톱 창은 항상 127.0.0.1로 접속하므로 이 스위치의 영향을 받지 않습니다. 여기서 제어하는 것은 "LAN의 다른 기기 접속 허용 여부"입니다.',
+  'admin.webAccess.warn.lan_exposed':
+    'LAN 접속이 열려 있습니다. 같은 네트워크의 누구나 로그인 페이지를 열 수 있으니 비밀번호가 충분히 강한지 확인하고, 신뢰하는 네트워크에서만 켜세요.',
+  'admin.webAccess.warn.no_https':
+    '현재 HTTP 평문 통신입니다. 로그인 비밀번호와 조회 결과가 LAN에서 도청될 수 있으므로 신뢰할 수 있는 내부망에서만 사용하세요.',
+  'admin.webAccess.warn.default_password':
+    '아직 초기 비밀번호를 쓰는 계정이 있습니다. LAN 접속을 열기 전에 해당 비밀번호를 먼저 변경하세요.',
+  'admin.webAccess.err.load': 'LAN 설정을 읽지 못했습니다: {message}',
+  'admin.webAccess.err.save': 'LAN 설정을 저장하지 못했습니다: {message}',
+  'admin.webAccess.err.copy': '복사하지 못했습니다. 주소를 직접 선택해 복사하세요.',
+
   // —— 알림 표시줄(toast) ——
   'admin.toast.close': '알림 닫기',
 };

@@ -533,6 +533,29 @@ export interface SettingItemDTO {
   updatedAt: string;
 }
 
+/** Web 页面访问风险提示（GET /meta/web-access） */
+export type WebAccessWarning = 'lan_exposed' | 'no_https' | 'default_password';
+
+/**
+ * Web 页面访问状态（GET /meta/web-access）。
+ *
+ * `saved` 是设置里存下来的值，`effective` 是**本次进程启动时实际生效**的值：
+ * 绑定地址必须在 listen 之前决定，所以保存后要重启才生效。
+ * 界面必须把两者分开展示，否则会出现"显示已开启、实际连不上"的假象。
+ */
+export interface WebAccessDTO {
+  saved: { lanEnabled: boolean; lanPort: number };
+  effective: { lanEnabled: boolean; host: string; port: number; scheme: string };
+  restartRequired: boolean;
+  /** 可直接贴给别人的访问地址（关闭局域网时只有回环地址） */
+  urls: string[];
+  /** 本机所有可用的 IPv4 局域网地址 */
+  lanAddresses: string[];
+  warnings: WebAccessWarning[];
+  /** 是否运行在桌面端内嵌服务里（桌面窗口始终走 127.0.0.1，不受该开关影响） */
+  embedded: boolean;
+}
+
 export interface AiHistoryDTO {
   id: number;
   scene: string;

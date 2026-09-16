@@ -210,6 +210,43 @@ Authorization: Bearer <JWT>
 返回可写设置项及其类型/取值范围（`boolean` / `integer` + min/max / `enum` + values）与中文说明，
 让界面不必自己再抄一份白名单（两份清单一旦漂移就会出现"界面能改、后端拒绝"）。
 
+### ✅ `GET /meta/web-access` 🔒 `settings.manage`
+
+返回"局域网访问（Web 页面）"的**已保存值**与**本次进程实际生效值**。两者必须分开返回：
+绑定地址与端口只能在 `listen` 之前决定，所以设置保存后必须重启才生效。
+只返回设置项会让界面无法区分"已保存"和"已生效"，出现"显示已开启、实际连不上"的假象。
+
+```json
+{
+  "saved":     { "lanEnabled": true, "lanPort": 8787 },
+  "effective": { "lanEnabled": false, "host": "127.0.0.1", "port": 54321, "scheme": "http" },
+  "restartRequired": true,
+  "urls": ["http://127.0.0.1:8787"],
+  "lanAddresses": ["192.168.1.5"],
+  "warnings": ["lan_exposed", "no_https"],
+  "embedded": false
+}
+```
+
+几处刻意的取舍：
+
+- **`effective.host` 永远不回传通配地址**。`0.0.0.0` 贴到界面上用户没法拿它访问，
+  会被换成 `127.0.0.1`；"是否真的对外开放"由 `effective.lanEnabled` 如实表达。
+- **关闭时 `urls` 只有回环地址**。此时把局域网地址给出去也没用，只会让人误以为能访问。
+- **`warnings` 取"已生效 或 已保存将生效"的并集**，而不是只看已生效的。
+  用户刚打开开关、还没重启的那一刻，恰恰是他最该先看到风险的时候——
+  否则就等于"先把弱口令的服务暴露到局域网，再告诉他不该这么做"。
+  取值：`lan_exposed` / `no_https` / `default_password`（都有账号还在用初始口令）。
+- **`embedded`** 为 `true` 表示运行在桌面端内嵌服务里；桌面窗口始终走 `127.0.0.1`，
+  不受该开关影响。
+
+两个开关项的键：`web.lan_enabled`（boolean）、`web.lan_port`（integer，1024–65535），
+用 `PUT /meta/settings` 修改。**`PEANUTSPROUT_HOST` / `PEANUTSPROUT_PORT` 优先于这两个设置**：
+它们由 systemd/容器/桌面端主进程设定，属于"监听在哪"的硬性要求，
+若能被人改一个界面开关就覆盖掉，运维的绑定策略与桌面端的端口探测都会失效。
+桌面端要让界面开关生效，就得自己先读设置、再以环境变量传给子进程
+（见 `apps/desktop/web-access.mjs`）。
+
 ### ✅ `GET /meta/production-check/:id` 🔒 需登录
 
 判断连接是否属于生产库（用于界面红标与 AI 写闸门）。

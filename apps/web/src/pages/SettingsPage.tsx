@@ -9,6 +9,7 @@ import { AiSettingsCard } from '../components/AiSettingsCard';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icons';
 import { LanguageSelect } from '../components/LanguageSwitcher';
+import { WebAccessCard } from '../components/WebAccessCard';
 import { useAuth } from '../state/auth';
 import { useI18n } from '../state/i18n';
 import { useTheme } from '../state/theme';
@@ -132,6 +133,9 @@ export function SettingsPage() {
     <div className="page page--narrow">
       {/* AI 配置需要 settings.manage 权限，非管理员不渲染（后端也会再挡一次） */}
       {user?.isAdmin ? <AiSettingsCard /> : null}
+
+      {/* 局域网访问也走 settings.manage：把它暴露给普通用户等于让任何人决定对外开不开放 */}
+      {user?.isAdmin ? <WebAccessCard /> : null}
 
       <section className="card">
         <header className="card__header">

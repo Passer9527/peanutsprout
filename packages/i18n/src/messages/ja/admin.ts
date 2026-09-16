@@ -102,6 +102,40 @@ const messages: Partial<Record<MessageKeyWithPlurals, string>> = {
   'admin.settings.about.stack': 'Web 技術スタック',
   'admin.settings.about.stackValue': 'React 19 · TypeScript 5.9 · Vite 7（サードパーティ製の UI / 状態管理 / ルーティング / グラフライブラリなし）',
 
+  // —— 設定：LAN アクセス（Web ページ）——
+  'admin.webAccess.title': 'LAN アクセス（Web ページ）',
+  'admin.webAccess.subtitle':
+    '有効にすると、同じ LAN 上の他の端末からブラウザで本ツールにアクセスできます。無効の場合は 127.0.0.1 のみを待ち受け、本機からのみ利用できます。',
+  'admin.webAccess.toggle.label': 'LAN アクセスを許可',
+  'admin.webAccess.toggle.hint': 'オフのときは 127.0.0.1 のみにバインドし、他の端末から接続できません。',
+  'admin.webAccess.port.label': 'アクセスポート',
+  'admin.webAccess.port.hint':
+    '範囲は 1024–65535。有効にするとポートが固定されるため、共有した URL が使われ続けます。',
+  'admin.webAccess.port.err': 'ポートは 1024〜65535 の整数で指定してください。',
+  'admin.webAccess.save': '設定を保存',
+  'admin.webAccess.saving': '保存中…',
+  'admin.webAccess.current.title': '現在有効な設定',
+  'admin.webAccess.current.on': 'LAN に公開中 · {host}:{port}',
+  'admin.webAccess.current.off': '本機のみ · {host}:{port}',
+  'admin.webAccess.restart.title': '再起動後に有効になります',
+  'admin.webAccess.restart.body':
+    '待ち受けアドレスとポートは起動時に確定します。設定は保存済みです。新しいアドレスを有効にするには花生苗を再起動してください。',
+  'admin.webAccess.url.title': '利用可能なアクセス先',
+  'admin.webAccess.url.empty': 'LAN アドレスが検出できません。ネットワーク接続を確認してください。',
+  'admin.webAccess.copy': 'コピー',
+  'admin.webAccess.copied': 'アドレスをクリップボードにコピーしました。',
+  'admin.webAccess.embedded':
+    'デスクトップ版のウィンドウは常に 127.0.0.1 経由でアクセスするため、このスイッチの影響を受けません。ここで制御するのは「LAN 上の他の端末からのアクセスを許可するか」です。',
+  'admin.webAccess.warn.lan_exposed':
+    'LAN アクセスが開放されています。同じネットワーク上の誰でもログイン画面を開けます。パスワードが十分に強いことを確認し、信頼できるネットワークでのみ有効にしてください。',
+  'admin.webAccess.warn.no_https':
+    '現在は HTTP の平文通信です。ログインパスワードやクエリ結果が LAN 上で盗聴される可能性があるため、信頼できるイントラネットでのみ使用してください。',
+  'admin.webAccess.warn.default_password':
+    '初期パスワードのままのアカウントがあります。LAN アクセスを開放する前に、これらのパスワードを変更してください。',
+  'admin.webAccess.err.load': 'LAN 設定の読み込みに失敗しました：{message}',
+  'admin.webAccess.err.save': 'LAN 設定の保存に失敗しました：{message}',
+  'admin.webAccess.err.copy': 'コピーに失敗しました。アドレスを選択して手動でコピーしてください。',
+
   // —— 通知（toast）——
   'admin.toast.close': '通知を閉じる',
 };

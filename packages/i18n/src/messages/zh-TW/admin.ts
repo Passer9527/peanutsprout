@@ -101,6 +101,39 @@ const messages: Partial<Record<MessageKeyWithPlurals, string>> = {
   'admin.settings.about.stack': 'Web 技術堆疊',
   'admin.settings.about.stackValue': 'React 19 · TypeScript 5.9 · Vite 7（無第三方 UI / 狀態 / 路由 / 圖表庫）',
 
+  // —— 設定：區域網路存取（Web 頁面）——
+  'admin.webAccess.title': '區域網路存取（Web 頁面）',
+  'admin.webAccess.subtitle':
+    '開啟後，同一區域網路內的其他裝置可以直接用瀏覽器存取本工具；關閉時只監聽 127.0.0.1，僅本機可用。',
+  'admin.webAccess.toggle.label': '允許區域網路存取',
+  'admin.webAccess.toggle.hint': '關閉時只綁定 127.0.0.1，其他機器無法連線。',
+  'admin.webAccess.port.label': '存取連接埠',
+  'admin.webAccess.port.hint': '範圍 1024–65535。開啟後連接埠固定不變，分享出去的網址才長期有效。',
+  'admin.webAccess.port.err': '連接埠需為 1024–65535 之間的整數。',
+  'admin.webAccess.save': '儲存設定',
+  'admin.webAccess.saving': '儲存中…',
+  'admin.webAccess.current.title': '目前實際生效',
+  'admin.webAccess.current.on': '已開放區域網路 · {host}:{port}',
+  'admin.webAccess.current.off': '僅本機可存取 · {host}:{port}',
+  'admin.webAccess.restart.title': '需要重新啟動後生效',
+  'admin.webAccess.restart.body':
+    '監聽位址與連接埠只在程式啟動時決定。設定已儲存，重新啟動花生苗後新的位址才會生效。',
+  'admin.webAccess.url.title': '可用存取網址',
+  'admin.webAccess.url.empty': '未偵測到區域網路位址，請檢查網路連線。',
+  'admin.webAccess.copy': '複製',
+  'admin.webAccess.copied': '網址已複製到剪貼簿。',
+  'admin.webAccess.embedded':
+    '桌面端視窗一律透過 127.0.0.1 存取，不受此開關影響；這裡控制的是「是否允許區域網路內其他裝置存取」。',
+  'admin.webAccess.warn.lan_exposed':
+    '區域網路存取已開放：同一網路內的任何人都能開啟登入頁。請確認帳號密碼足夠強，並只在自己信任的網路裡開啟。',
+  'admin.webAccess.warn.no_https':
+    '目前使用 HTTP 明文傳輸，登入密碼與查詢結果在區域網路內可能被竊聽，建議僅在可信任的內網使用。',
+  'admin.webAccess.warn.default_password':
+    '仍有帳號在使用初始密碼。請先修改這些帳號的密碼，再開放區域網路存取。',
+  'admin.webAccess.err.load': '讀取區域網路設定失敗：{message}',
+  'admin.webAccess.err.save': '儲存區域網路設定失敗：{message}',
+  'admin.webAccess.err.copy': '複製失敗，請手動選取網址後複製。',
+
   // —— 提示條（toast）——
   'admin.toast.close': '關閉提示',
 };

@@ -45,14 +45,6 @@ export async function pickFreePort(host = '127.0.0.1') {
 }
 
 /**
- * 复刻 packages/core/src/paths.ts 的 resolveDataDir 语义。
- *
- * 为什么不直接 import @peanutsprout/core：打包态只带 Electron 外壳，
- * 没有任何 node_modules，桌面端 main.mjs/port-util.mjs 必须零依赖。
- * baseDir 需要显式传入，因为服务端子进程的 cwd 与本进程可能不同，
- * 相对路径的 PEANUTSPROUT_HOME 必须在**子进程的 cwd** 下解析才一致。
- */
-/**
  * 校验 /api/v1/health 的应答者确实是"我这次启动的那个服务端"。
  *
  * 健康检查的 HTTP 200 只能证明"端口上有人活着"，证明不了"活着的是我 spawn 的子进程"：
