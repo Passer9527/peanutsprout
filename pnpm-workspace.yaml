@@ -13,6 +13,13 @@ packages:
 allowBuilds:
   '@embedded-postgres/linux-x64': true
   electron: true
+  # electron-winstaller 只用于生成 **Squirrel** Windows 安装包，而本项目 win 目标是 NSIS，
+  # 用不到它（它的安装脚本仅用于挑选 7-Zip 二进制架构）。显式设为 false 有两个好处：
+  #  ① pnpm 不再把它视为"待批准的构建脚本"，避免往本文件写入
+  #     `set this to true or false` 占位符 —— 那个占位符会让后续任何 pnpm 命令硬失败
+  #     （ERR_PNPM_IGNORED_BUILDS），而且会把这个受版本控制的文件改脏；
+  #  ② 少跑一个第三方安装脚本，供应链面更小。
+  electron-winstaller: false
   esbuild: true
 
 onlyBuiltDependencies:
